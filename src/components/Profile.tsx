@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
+
 import Cropper from "react-easy-crop"
 // @ts-ignore
 import getCroppedImg from "../utils/cropImage"
@@ -16,7 +16,7 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user }) => {
   const { userId } = useParams<{ userId: string }>()
-  const { logout, userId: authUserId } = useAuth()
+ 
   const navigate = useNavigate()
   const [form, setForm] = useState({
     name: "",
@@ -93,22 +93,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError("File size must be less than 5MB")
-        return
-      }
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
-        setForm({ ...form, profilePhoto: reader.result as string })
-      }
-      reader.readAsDataURL(file)
-    }
-  }
+ 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -150,14 +135,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      navigate("/login")
-    } catch (error) {
-      console.error("Logout failed:", error)
-    }
-  }
+  
 
   const getInitials = (name: string) => {
     if (!name) return "U"
@@ -169,10 +147,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       .slice(0, 2)
   }
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click()
-  }
-
+  
   // Handler for deleting profile
   const handleDelete = async () => {
     if (!userId) return

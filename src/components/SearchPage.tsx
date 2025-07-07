@@ -60,32 +60,7 @@ const Search = () => {
   }
 
   // Load online users
-  const fetchOnlineUsers = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/profile/online`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!res.ok) throw new Error("Failed to fetch online users")
-
-      const response = await res.json()
-
-      // Check if the response has the expected structure
-      if (!response.success || !Array.isArray(response.users)) {
-        console.error("Unexpected response format:", response)
-        return []
-      }
-
-      // Extract just the IDs of online users
-      return response.users.map((user: any) => user._id)
-    } catch (err) {
-      console.error("Error fetching online users:", err)
-      toast("Failed to load online users")
-      return []
-    }
-  }
+  
 
   // Load profiles
   const fetchUsers = async () => {

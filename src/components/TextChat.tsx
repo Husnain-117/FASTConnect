@@ -75,15 +75,15 @@ const TextChat: React.FC = () => {
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
+  const [isTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const { socket } = useSocket()
   const { user, token } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [filter, setFilter] = useState<string>("all")
-  const [customStart, setCustomStart] = useState<string>("")
-  const [customEnd, setCustomEnd] = useState<string>("")
+  const [customStart] = useState<string>("")
+  const [customEnd] = useState<string>("")
   const [onlineUsers, setOnlineUsers] = useState<string[]>([])
   const [onlineUsersError, setOnlineUsersError] = useState<string | null>(null)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
@@ -99,6 +99,7 @@ const TextChat: React.FC = () => {
   const getDisabledMessage = () => {
     if (filter === "today" || filter === "all") return ""
     return "Switch to 'Today' or 'All' to send messages"
+    
   }
 
   // Fetch initial messages
@@ -112,6 +113,7 @@ const TextChat: React.FC = () => {
         console.error("Error fetching messages:", err)
       } finally {
         setLoading(false)
+        onlineUsersError;
       }
     }
     fetchMessages()

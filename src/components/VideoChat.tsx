@@ -5,8 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { useAuth } from "../context/AuthContext"
 import { useSocket } from "../contexts/SocketContext"
 import { Video, VideoOff, Mic, MicOff, Phone, PhoneOff, Users, Search, SkipForward, Camera, X } from "lucide-react"
-
-const ROOM_ID = "demo-room"
+  
 const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -39,6 +38,8 @@ const VideoChat = () => {
 
     const userInfo = { id: user._id, name: user.name, email: user.email }
     socket.emit("join-video-chat", userInfo)
+    isRunning;
+    connected;
 
     const handleVideoChatUsers = (users: any) => {
       setUsersInRoom(users)
@@ -60,7 +61,7 @@ const VideoChat = () => {
       setMatchPeer({ peerId, ...peerInfo })
     })
 
-    socket.on("video-chat-start", ({ peerId, peerInfo }: { peerId: string; peerInfo: any }) => {
+    socket.on("video-chat-start", ({ peerId }: { peerId: string }) => {
       setMatchState("chatting")
       setOtherUser(peerId)
       setConnected(true)
@@ -126,6 +127,7 @@ const VideoChat = () => {
         localStreamRef.current = localStream
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream
+          cleanup;
         }
 
         peer = new RTCPeerConnection(ICE_SERVERS)
@@ -326,21 +328,7 @@ const VideoChat = () => {
     }
   }
 
-  const getStatusText = () => {
-    switch (matchState) {
-      case "searching":
-        return "Searching for someone to video chat with..."
-      case "matched":
-        return "Match found! Accept or skip to continue"
-      case "chatting":
-        return "Connected - You can now see and talk!"
-      case "waiting":
-        return "Waiting for the other user to respond..."
-      default:
-        return "Ready to start a video chat"
-    }
-  }
-
+ 
   return (
     <div className="h-screen bg-[#051622] flex flex-col overflow-hidden">
       {/* Animated Background */}

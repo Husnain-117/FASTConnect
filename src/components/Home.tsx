@@ -1,21 +1,13 @@
 "use client"
 
-import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import Navbar from "./Navbar"
 
 const Home = () => {
-  const { user, logout, userId } = useAuth()
+
   const navigate = useNavigate()
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-      navigate("/login")
-    } catch (error) {
-      console.error("Logout failed:", error)
-    }
-  }
+
 
   const handleVideoCall = () => {
     navigate("/videochat")
@@ -25,25 +17,13 @@ const Home = () => {
     navigate("/voice-chat")
   }
 
-  const goToProfile = () => {
-    if (userId && userId !== "undefined") {
-      navigate("/profile")
-    } else {
-      navigate("/login")
-    }
-  }
 
-  const handleAbout = () => {
-    navigate("/about")
-  }
 
-  const handleSearch = () => {
-    navigate("/search")
-  }
 
-  const handleGuidelines = () => {
-    navigate("/guidelines")
-  }
+
+
+
+
 
   return (
     <div className="min-h-screen bg-[#051622] relative overflow-hidden">

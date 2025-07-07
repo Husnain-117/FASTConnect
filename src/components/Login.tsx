@@ -20,8 +20,8 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [campus, setCampus] = useState("")
-  const { login, userId, user } = useAuth()
+  
+  const { login} = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {

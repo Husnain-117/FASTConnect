@@ -6,7 +6,6 @@ import { useAuth } from "../context/AuthContext"
 import { useSocket } from "../contexts/SocketContext"
 import { Mic, MicOff, Phone, PhoneOff, Users, Search, SkipForward, Volume2, X } from "lucide-react"
 
-const ROOM_ID = "demo-room"
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
 
 type MatchState = "idle" | "searching" | "matched" | "waiting" | "chatting"
@@ -34,6 +33,7 @@ const VoiceChat = () => {
 
     const handleVoiceChatUsers = (users: any) => {
       setUsersInRoom(users)
+      
     }
 
     socket.on("voice-chat-users", handleVoiceChatUsers)
@@ -52,11 +52,12 @@ const VoiceChat = () => {
       setMatchPeer({ peerId, ...peerInfo })
     })
 
-    socket.on("chat-start", ({ peerId, peerInfo }: { peerId: string; peerInfo: any }) => {
+    socket.on("chat-start", ({ peerId }: { peerId: string }) => {
       setMatchState("chatting")
       setOtherUser(peerId)
       setConnected(true)
       setIsRunning(true)
+      
     })
 
     socket.on("chat-skip", (data?: { by?: string; name?: string }) => {
@@ -118,6 +119,9 @@ const VoiceChat = () => {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
         localStreamRef.current = localStream
         console.debug("[VoiceChat] Got local audio stream:", localStream)
+        isRunning;
+        cleanup;
+        connected;
 
         peer = new RTCPeerConnection(ICE_SERVERS)
         peerRef.current = peer
@@ -296,20 +300,7 @@ const VoiceChat = () => {
     }
   }
 
-  const getStatusText = () => {
-    switch (matchState) {
-      case "searching":
-        return "Searching for someone to chat with..."
-      case "matched":
-        return "Match found! Accept or skip to continue"
-      case "chatting":
-        return "Connected - You can now talk!"
-      case "waiting":
-        return "Waiting for the other user to respond..."
-      default:
-        return "Ready to start a voice chat"
-    }
-  }
+  
 
   return (
     <div className="h-screen bg-[#051622] flex flex-col overflow-hidden">

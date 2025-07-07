@@ -30,12 +30,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     if (storedToken) {
       setToken(storedToken);
+      
       // Fetch user data
       axiosInstance.get('/auth/me')
         .then(response => {
@@ -76,11 +77,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
+      error;
       throw error;
     }
   };
 
-  const register = async (email: string, password: string, name: string, campus: string, batch: string) => {
+  const register = async (email: string) => {
     try {
       await axiosInstance.post('/auth/send-otp', { email });
       // After OTP is sent, user will need to verify and complete registration
@@ -115,8 +117,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       return response.data;
     } catch (error: any) {
-      setError(error.response?.data?.message || 'An error occurred during registration');
-      throw error;
+         throw new Error(error.response?.data?.message || 'An error occurred while registering');
+      
     }
   };
 
