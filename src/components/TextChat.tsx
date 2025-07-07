@@ -6,8 +6,7 @@ import axiosInstance from "../api/axiosConfig"
 import { useAuth } from "../context/AuthContext"
 import Navbar from "./Navbar"
 import { useSocket } from "../contexts/SocketContext"
-import Picker from "@emoji-mart/react"
-import data from "@emoji-mart/data"
+import EmojiPicker, { Theme } from "emoji-picker-react"
 import API_BASE_URL from "../config/apiBaseUrl"
 
 interface Message {
@@ -598,17 +597,16 @@ const TextChat: React.FC = () => {
               </button>
 
               {showEmojiPicker && !isInputDisabled() && (
-                <div className="absolute bottom-20 left-4 z-50">
-                  <Picker
-                    data={data}
-                    onEmojiSelect={(emoji: any) => {
-                      setNewMessage(newMessage + emoji.native)
-                      setShowEmojiPicker(false)
-                    }}
-                    theme="dark"
-                  />
-                </div>
-              )}
+  <div className="absolute bottom-20 left-4 z-50">
+    <EmojiPicker
+      theme={Theme.DARK}
+      onEmojiClick={(emojiData) => {
+        setNewMessage(newMessage + emojiData.emoji);
+        setShowEmojiPicker(false);
+      }}
+    />
+  </div>
+)}
 
               {/* Message input */}
               <div className="flex-1 relative">
