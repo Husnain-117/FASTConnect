@@ -73,7 +73,7 @@ export default tseslint.config([
 Create a `.env` file in this directory with the following content:
 
 ```
-VITE_API_URL=https://localhost:5000/api
+VITE_API_URL=https://vercel-backend-psi-sooty.vercel.app/api
 ```
 
 - Change the URL to match your backend server if needed (e.g., LAN IP for mobile testing).
