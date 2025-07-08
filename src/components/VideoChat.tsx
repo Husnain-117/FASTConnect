@@ -53,6 +53,7 @@ const VideoChat = () => {
   const [retryCount, setRetryCount] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
   const [systemMessage, setSystemMessage] = useState<string | null>(null)
+  const [showEndedPopup, setShowEndedPopup] = useState<{ visible: boolean; name?: string } | null>(null)
 
   const localStreamRef = useRef<MediaStream | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -64,6 +65,8 @@ const VideoChat = () => {
   const { user } = useAuth()
   const { socket } = useSocket()
 
+  isRunning;
+  connected;
   const MAX_RETRY_ATTEMPTS = 3
   const RETRY_DELAYS = [2000, 5000, 10000] // Progressive delays
 
@@ -429,6 +432,8 @@ const VideoChat = () => {
       setIsRunning(false)
       setRetryCount(0)
       setConnectionError(null)
+      setShowEndedPopup({ visible: true, name: data?.name })
+      setTimeout(() => setShowEndedPopup(null), 2000)
       if (data && data.name) {
         setSystemMessage(`${data.name} ended the chat.`)
       } else {
@@ -603,31 +608,26 @@ const VideoChat = () => {
 
           {/* Connection Error Display */}
           {connectionError && (
-            <div className="p-4 text-center">
-              <div className="inline-block bg-red-900/20 backdrop-blur-sm border border-red-500/30 rounded-lg p-4 max-w-md">
-                <div className="flex items-center justify-center mb-2">
-                  <AlertTriangle className="w-5 h-5 text-red-400 mr-2" />
-                  <span className="text-red-200 font-medium">Connection Error</span>
-                </div>
-                <p className="text-red-200 text-sm mb-3">{connectionError.message}</p>
-                {connectionError.canRetry && !isRetrying && (
-                  <button
-                    onClick={handleManualRetry}
-                    className="inline-flex items-center space-x-2 px-4 py-2 bg-[#1BA098] hover:bg-[#159084] text-white rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Retry Connection</span>
-                  </button>
-                )}
-                {isRetrying && (
-                  <div className="flex items-center justify-center space-x-2 text-yellow-200">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Retrying...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+  <div className="flex justify-center mt-0 mb-10">
+    <div className="flex items-center bg-red-900/80 text-red-100 px-3 py-2 rounded shadow space-x-2 text-xs max-w-xs">
+      <AlertTriangle className="w-4 h-4 text-red-300" />
+      <span>
+        {connectionError.message || "Camera/mic in use. Close other apps and retry."}
+      </span>
+      {connectionError.canRetry && !isRetrying && (
+        <button
+          onClick={handleManualRetry}
+          className="ml-2 px-2 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-xs"
+        >
+          Retry
+        </button>
+      )}
+      {isRetrying && (
+        <RefreshCw className="w-4 h-4 animate-spin text-yellow-200 ml-2" />
+      )}
+    </div>
+  </div>
+)}
 
           {/* Main Video Content */}
           <div className="flex-1 flex items-center justify-center p-6">
@@ -815,6 +815,14 @@ const VideoChat = () => {
             )}
           </div>
 
+          {/* Ended Popup */}
+          {showEndedPopup?.visible && (
+            <div className="fixed top-8 left-1/2 z-50 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl border-2 border-red-300 animate-fade-in text-lg font-semibold flex items-center space-x-2">
+              <PhoneOff className="w-6 h-6 mr-2" />
+              <span>{showEndedPopup.name ? `${showEndedPopup.name} ended the call` : "The other user ended the call"}</span>
+            </div>
+          )}
+
           {/* Controls */}
           {matchState === "chatting" && (
             <div className="border-t border-[#1BA098]/20 bg-[#051622]/90 backdrop-blur-sm p-6">
@@ -843,9 +851,13 @@ const VideoChat = () => {
 
                 <button
                   onClick={stopVideoChat}
-                  className="group relative w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-red-300"
+                  aria-label="End Call"
+                  tabIndex={0}
+                  className="group relative w-20 h-20 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex flex-col items-center justify-center shadow-2xl hover:shadow-[0_0_25px_#ef4444] focus:outline-none focus:ring-4 focus:ring-red-300 ring-offset-2 ring-2 ring-red-400 border-4 border-white/10 transition-all duration-300 hover:scale-110"
                 >
-                  <PhoneOff className="w-7 h-7 text-white" />
+                  <span className="absolute -top-9 left-1/2 -translate-x-1/2 hidden md:block bg-black/90 text-white text-xs px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">End Call</span>
+                  <PhoneOff className="w-9 h-9 text-white drop-shadow-lg" aria-hidden="true" />
+                  <span className="mt-2 text-xs font-bold tracking-wide text-red-100 hidden md:block">End Call</span>
                 </button>
               </div>
             </div>
