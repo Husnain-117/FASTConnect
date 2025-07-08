@@ -170,8 +170,11 @@ const VideoChat = () => {
           await peer.setLocalDescription(offer)
           socket.emit("offer", { offer, to: otherUser })
         }
-      } catch (err) {
-        console.error("[VideoChat] Error setting up WebRTC:", err)
+      } catch (err: any) {
+        if (err.name === "NotReadableError") {
+          alert("Camera or microphone is already in use by another application. Please close other apps or tabs and try again.");
+        }
+        console.error("[VideoChat] Error setting up WebRTC:", err);
       }
     }
 
@@ -221,22 +224,24 @@ const VideoChat = () => {
       socket.off("answer", handleAnswer)
       socket.off("ice-candidate", handleIceCandidate)
 
+      // Clean up peer connection
       if (peerRef.current) {
-        peerRef.current.close()
-        peerRef.current = null
+        peerRef.current.close();
+        peerRef.current = null;
       }
 
+      // Stop all local media tracks
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop())
-        localStreamRef.current = null
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
       }
 
+      // Clean up video elements
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null
+        remoteVideoRef.current.srcObject = null;
       }
-
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null
+        localVideoRef.current.srcObject = null;
       }
     }
   }, [matchState, otherUser])
