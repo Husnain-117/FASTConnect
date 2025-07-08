@@ -28,10 +28,10 @@ const Login = () => {
     e.preventDefault()
     setError("")
     setSuccess("")
-    if (!email.endsWith("@nu.edu.pk") && !email.endsWith("@isb.nu.edu.pk")) {
-      setError("Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed.");
-      return;
-    }
+    // if (!email.endsWith("@nu.edu.pk") && !email.endsWith("@isb.nu.edu.pk")) {
+    //   setError("Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed.");
+    //   return;
+    // }
     setIsLoading(true)
     try {
       await login(email, password)

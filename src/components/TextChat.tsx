@@ -8,6 +8,7 @@ import Navbar from "./Navbar"
 import { useSocket } from "../contexts/SocketContext"
 import EmojiPicker, { Theme } from "emoji-picker-react"
 import API_BASE_URL from "../config/apiBaseUrl"
+import styles from "./TextChat.module.css"
 
 interface Message {
   _id: string
@@ -498,8 +499,8 @@ const TextChat: React.FC = () => {
                         <div
                           className={`rounded-2xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all duration-200 hover:scale-[1.02] ${
                             isOwnMessage
-                              ? "bg-gradient-to-r from-[#1BA098] to-[#159084] text-white rounded-br-md border-[#1BA098]/30"
-                              : "bg-[#051622]/60 border-[#1BA098]/20 text-[#DEB992] rounded-bl-md"
+                              ? styles.messageSender
+                              : styles.messageReceiver
                           }`}
                         >
                           {/* Sender Name */}

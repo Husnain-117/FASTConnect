@@ -1,0 +1,19 @@
+.messageSender {
+  background: linear-gradient(90deg, #4f8cff 0%, #1BA098 100%);
+  color: #fff;
+  align-self: flex-end;
+  margin-left: auto;
+  margin-right: 0;
+  text-align: right;
+  border-radius: 18px 18px 4px 18px;
+}
+
+.messageReceiver {
+  background: #f1f0f0;
+  color: #222;
+  align-self: flex-start;
+  margin-right: auto;
+  margin-left: 0;
+  text-align: left;
+  border-radius: 18px 4px 18px 18px;
+}
