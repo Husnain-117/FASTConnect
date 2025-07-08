@@ -58,6 +58,8 @@ const VoiceChat = () => {
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  isRunning;
+  connected;
   const { user } = useAuth()
   const { socket } = useSocket()
 
