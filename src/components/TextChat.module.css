@@ -1,19 +1,70 @@
 .messageSender {
-  background: linear-gradient(90deg, #4f8cff 0%, #1BA098 100%);
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
   color: #fff;
   align-self: flex-end;
-  margin-left: auto;
+  margin-left: 40px;
   margin-right: 0;
   text-align: right;
-  border-radius: 18px 18px 4px 18px;
+  border-radius: 18px 18px 6px 18px;
+  box-shadow: 0 2px 8px rgba(44, 183, 128, 0.08);
+  position: relative;
+}
+
+.messageSender::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 12px solid #128C7E;
 }
 
 .messageReceiver {
-  background: #f1f0f0;
+  background: #f7fafd;
   color: #222;
   align-self: flex-start;
-  margin-right: auto;
+  margin-right: 40px;
   margin-left: 0;
   text-align: left;
-  border-radius: 18px 4px 18px 18px;
+  border-radius: 18px 6px 18px 18px;
+  box-shadow: 0 2px 8px rgba(44, 183, 128, 0.04);
+  position: relative;
+}
+
+.messageReceiver::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 12px solid #f7fafd;
+}
+
+.scrollToBottomBtn {
+  position: fixed;
+  right: 32px;
+  bottom: 96px;
+  z-index: 50;
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 4px 16px rgba(44, 183, 128, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.scrollToBottomBtn:hover {
+  background: linear-gradient(135deg, #128C7E 0%, #25D366 100%);
+  box-shadow: 0 6px 20px rgba(44, 183, 128, 0.28);
 }
