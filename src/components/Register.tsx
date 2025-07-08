@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
@@ -20,6 +19,8 @@ const Register = () => {
   const [canResend, setCanResend] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
+  const [isSendingOTP, setIsSendingOTP] = useState(false) // New state for OTP sending
+
   const { sendOTP, verifyAndRegister } = useAuth()
   const navigate = useNavigate()
 
@@ -43,17 +44,25 @@ const Register = () => {
     e.preventDefault()
     setError("")
     setSuccess("")
+
     if (!email.endsWith("@nu.edu.pk") && !email.endsWith("@isb.nu.edu.pk")) {
-      setError("Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed.");
-      return;
+      setError("Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed.")
+      return
     }
+
+    setIsSendingOTP(true) // Start loading
+
     try {
       await sendOTP(email)
       setOTPSent(true)
       setSuccess("Verification code sent to your email!")
+      setResendTimer(30) // Reduced to 30 seconds
+      setCanResend(false)
       setTimeout(() => setSuccess(""), 2000)
     } catch (err: any) {
       setError(err.response?.data?.message || "An error occurred")
+    } finally {
+      setIsSendingOTP(false) // Stop loading
     }
   }
 
@@ -61,11 +70,14 @@ const Register = () => {
     e.preventDefault()
     setError("")
     setSuccess("")
-    if (!email.endsWith("@isb.nu.edu.pk")) {
-      setError("Only @isb.nu.edu.pk email addresses are allowed.");
-      return;
+
+    if (!email.endsWith("@isb.nu.edu.pk") && !email.endsWith("@nu.edu.pk")) {
+      setError("Only @isb.nu.edu.pk email addresses are allowed.")
+      return
     }
+
     setIsRegistering(true)
+
     try {
       await verifyAndRegister(email, otp, password, name, campus, batch)
       setSuccess("Registration successful! Redirecting to login...")
@@ -83,9 +95,10 @@ const Register = () => {
     setIsResending(true)
     setError("")
     setSuccess("")
+
     try {
       await sendOTP(email)
-      setResendTimer(60)
+      setResendTimer(30) // Reduced to 30 seconds
       setCanResend(false)
       setSuccess("Verification code resent successfully!")
       setTimeout(() => setSuccess(""), 3000)
@@ -159,6 +172,44 @@ const Register = () => {
           </div>
         </div>
 
+        {/* Loading Bar for OTP Sending */}
+        {isSendingOTP && (
+          <div className="mb-6 w-full animate-slide-in">
+            <div className="bg-[#1BA098]/20 backdrop-blur-sm rounded-xl p-4 border border-[#1BA098]/30">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="animate-spin h-5 w-5 text-[#1BA098]"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-[#1BA098] text-sm font-medium">Sending verification code...</p>
+                  <div className="w-full bg-[#051622]/40 rounded-full h-2 mt-2">
+                    <div className="bg-gradient-to-r from-[#1BA098] to-[#159084] h-2 rounded-full animate-pulse-width"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-emerald-900/20 rounded-xl w-full animate-slide-in">
@@ -205,7 +256,6 @@ const Register = () => {
                     Enter your university email to receive verification code
                   </p>
                 </div>
-
                 <div className="space-y-4">
                   <div className="animate-fade-in-delay-3">
                     <label
@@ -222,6 +272,7 @@ const Register = () => {
                         placeholder="your.email@nu.edu.pk"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        disabled={isSendingOTP}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,13 +286,39 @@ const Register = () => {
                       </div>
                     </div>
                   </div>
-
                   <button
                     type="submit"
                     onClick={handleSendOTP}
-                    className="w-full bg-[#1BA098] text-[#051622] py-3 px-6 rounded-xl font-bold text-lg mt-2 hover:bg-[#159084] focus:outline-none focus:ring-2 focus:ring-[#1BA098] focus:ring-offset-2 transition-all duration-300 hover:scale-105 hover:shadow-lg animate-fade-in-delay-4"
+                    disabled={isSendingOTP}
+                    className="w-full bg-[#1BA098] text-[#051622] py-3 px-6 rounded-xl font-bold text-lg mt-2 hover:bg-[#159084] focus:outline-none focus:ring-2 focus:ring-[#1BA098] focus:ring-offset-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:shadow-lg animate-fade-in-delay-4"
                   >
-                    Send Verification Code
+                    {isSendingOTP ? (
+                      <div className="flex items-center justify-center">
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-[#051622]"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Sending Code...
+                      </div>
+                    ) : (
+                      "Send Verification Code"
+                    )}
                   </button>
                 </div>
               </>
@@ -256,7 +333,6 @@ const Register = () => {
                     Check your email and enter the verification code
                   </p>
                 </div>
-
                 <div className="space-y-4">
                   {/* Email Field (Disabled) */}
                   <div className="animate-fade-in-delay-3">
@@ -273,7 +349,6 @@ const Register = () => {
                       value={email}
                     />
                   </div>
-
                   {/* OTP Field */}
                   <div className="animate-fade-in-delay-4">
                     <label
@@ -303,7 +378,33 @@ const Register = () => {
                             disabled={isResending}
                             className="font-medium text-[#1BA098] hover:text-[#159084] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
                           >
-                            {isResending ? "Sending..." : "Resend Code"}
+                            {isResending ? (
+                              <div className="flex items-center">
+                                <svg
+                                  className="animate-spin -ml-1 mr-1 h-3 w-3"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  ></circle>
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  ></path>
+                                </svg>
+                                Sending...
+                              </div>
+                            ) : (
+                              "Resend Code"
+                            )}
                           </button>
                         ) : (
                           <span style={{ color: "#DEB992", opacity: 0.6 }}>Resend in {resendTimer}s</span>
@@ -311,7 +412,6 @@ const Register = () => {
                       </div>
                     </div>
                   </div>
-
                   {/* Name and Campus Row */}
                   <div className="grid grid-cols-2 gap-4 animate-fade-in-delay-5">
                     <div>
@@ -347,7 +447,6 @@ const Register = () => {
                       />
                     </div>
                   </div>
-
                   {/* Batch and Password Row */}
                   <div className="grid grid-cols-2 gap-4 animate-fade-in-delay-6">
                     <div>
@@ -417,7 +516,6 @@ const Register = () => {
                       </div>
                     </div>
                   </div>
-
                   <button
                     type="submit"
                     onClick={handleVerifyAndRegister}
@@ -456,7 +554,6 @@ const Register = () => {
               </>
             )}
           </form>
-
           {/* Footer */}
           <div className="text-center mt-6 animate-fade-in-delay-8">
             <p className="text-sm" style={{ color: "#DEB992" }}>
@@ -469,7 +566,6 @@ const Register = () => {
               </Link>
             </p>
           </div>
-
           {/* Bottom Text */}
           <div className="text-center mt-4 animate-fade-in-delay-9">
             <p className="text-xs transition-all duration-300" style={{ color: "#DEB992", opacity: 0.8 }}>
@@ -504,12 +600,18 @@ const Register = () => {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.05); }
         }
+
+        @keyframes pulse-width {
+          0%, 100% { width: 20%; }
+          50% { width: 80%; }
+        }
         
         .animate-fade-in { animation: fade-in 0.6s ease-out; }
         .animate-slide-down { animation: slide-down 0.8s ease-out; }
         .animate-slide-up { animation: slide-up 0.6s ease-out; }
         .animate-slide-in { animation: slide-in 0.5s ease-out; }
         .animate-pulse-subtle { animation: pulse-subtle 3s ease-in-out infinite; }
+        .animate-pulse-width { animation: pulse-width 2s ease-in-out infinite; }
         .animate-fade-in-delay-1 { animation: fade-in 0.6s ease-out 0.1s both; }
         .animate-fade-in-delay-2 { animation: fade-in 0.6s ease-out 0.2s both; }
         .animate-fade-in-delay-3 { animation: fade-in 0.6s ease-out 0.3s both; }

@@ -10,6 +10,7 @@ import TextChat from './components/TextChat';
 import VoiceChat from './components/VoiceChat';
 import VideoChat from './components/VideoChat';
 import { useAuth } from './context/AuthContext';
+// import DirectMessageSender from './components/DirectMessageSender';
 
 function App() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ function App() {
       <Route path="/text-chat" element={<TextChat />} />
       <Route path="/voice-chat" element={<VoiceChat />} />
       <Route path="/videochat" element={<VideoChat />} />
+      {/* <Route path="/direct-message/:recipientId" element={<DirectMessageSender recipientId={user._id} />} /> */}
       <Route path="/" element={<Login />} />    
     </Routes>
   );
