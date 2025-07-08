@@ -15,7 +15,6 @@ import {
   X,
   RefreshCw,
   AlertTriangle,
-  
 } from "lucide-react"
 
 const ICE_SERVERS = {
@@ -53,8 +52,6 @@ const VoiceChat = () => {
   const [systemMessage, setSystemMessage] = useState<string | null>(null)
   const [callEndedBy, setCallEndedBy] = useState<string | null>(null)
 
-  isRunning;
-  connected;  
   const localStreamRef = useRef<MediaStream | null>(null)
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
   const peerRef = useRef<RTCPeerConnection | null>(null)
@@ -882,23 +879,25 @@ const VoiceChat = () => {
             {/* Controls */}
             {matchState === "chatting" && (
               <div className="border-t border-[#1BA098]/20 bg-[#051622]/90 backdrop-blur-sm p-6">
-                <div className="max-w-2xl mx-auto flex items-center justify-center space-x-6">
-                  <button
-                    onClick={toggleMute}
-                    className={`group relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 ${
-                      isMuted
-                        ? "bg-gradient-to-r from-red-500 to-red-600 focus:ring-red-300"
-                        : "bg-gradient-to-r from-[#1BA098] to-[#159084] focus:ring-[#1BA098]/30"
-                    }`}
-                  >
-                    {isMuted ? <MicOff className="w-6 h-6 text-white" /> : <Mic className="w-6 h-6 text-white" />}
-                  </button>
-                  <button
-                    onClick={() => stopVoiceChat()}
-                    className="group relative w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-red-300"
-                  >
-                    <PhoneOff className="w-7 h-7 text-white" />
-                  </button>
+                <div className="max-w-4xl mx-auto flex items-center justify-end pr-8">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={toggleMute}
+                      className={`group relative w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 ${
+                        isMuted
+                          ? "bg-gradient-to-r from-red-500 to-red-600 focus:ring-red-300"
+                          : "bg-gradient-to-r from-[#1BA098] to-[#159084] focus:ring-[#1BA098]/30"
+                      }`}
+                    >
+                      {isMuted ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-white" />}
+                    </button>
+                    <button
+                      onClick={() => stopVoiceChat()}
+                      className="group relative w-14 h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-red-300"
+                    >
+                      <PhoneOff className="w-6 h-6 text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

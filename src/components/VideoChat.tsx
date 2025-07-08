@@ -53,7 +53,7 @@ const VideoChat = () => {
   const [retryCount, setRetryCount] = useState(0)
   const [isRetrying, setIsRetrying] = useState(false)
   const [systemMessage, setSystemMessage] = useState<string | null>(null)
-  const [showEndedPopup, setShowEndedPopup] = useState<{ visible: boolean; name?: string } | null>(null)
+  // Removed unused showEndedPopup and callEndedBy
 
   const localStreamRef = useRef<MediaStream | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -423,7 +423,9 @@ const VideoChat = () => {
       socket.emit("start-video-search")
     })
 
-    socket.on("video-chat-ended", (data?: { by?: string; name?: string }) => {
+    // Unified call ended handler
+    socket.on("chat-ended", (data?: { by?: string; name?: string; reason?: string }) => {
+      console.log("[VideoChat] Call ended by:", data)
       cleanupConnection()
       setMatchState("idle")
       setMatchPeer(null)
@@ -432,13 +434,17 @@ const VideoChat = () => {
       setIsRunning(false)
       setRetryCount(0)
       setConnectionError(null)
-      setShowEndedPopup({ visible: true, name: data?.name })
-      setTimeout(() => setShowEndedPopup(null), 2000)
+
       if (data && data.name) {
-        setSystemMessage(`${data.name} ended the chat.`)
+        setSystemMessage(`${data.name} ended the call.`)
       } else {
         setSystemMessage("The other user ended the call.")
       }
+
+      // Auto-clear message after 5 seconds
+      setTimeout(() => {
+        setSystemMessage(null)
+      }, 5000)
     })
 
     socket.on("video-waiting-peer-response", () => {
@@ -514,18 +520,22 @@ const VideoChat = () => {
   }
 
   const stopVideoChat = () => {
-    if (socket && otherUser) {
-      socket.emit("video-chat-ended", { to: otherUser, name: user?.name })
+    if (matchState === "idle") return;
+    if (socket && otherUser && user) {
+      socket.emit("chat-ended", { to: otherUser, name: user.name, reason: "user_ended" });
     }
-    cleanupConnection()
-    setIsRunning(false)
-    setConnected(false)
-    setOtherUser(null)
-    setMatchState("idle")
-    setMatchPeer(null)
-    setRetryCount(0)
-    setConnectionError(null)
-    setSystemMessage("You ended the chat.")
+    cleanupConnection();
+    setIsRunning(false);
+    setConnected(false);
+    setOtherUser(null);
+    setMatchState("idle");
+    setMatchPeer(null);
+    setRetryCount(0);
+    setConnectionError(null);
+    setSystemMessage("You ended the chat.");
+    setTimeout(() => {
+      setSystemMessage(null);
+    }, 3000);
   }
 
   const toggleMute = () => {
@@ -549,7 +559,7 @@ const VideoChat = () => {
   }
 
   return (
-    <div className="h-screen bg-[#051622] flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-[#051622] flex flex-col">
       {/* Animated Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <svg className="w-full h-full" style={{ position: "absolute", top: 0, left: 0 }}>
@@ -814,14 +824,6 @@ const VideoChat = () => {
               </div>
             )}
           </div>
-
-          {/* Ended Popup */}
-          {showEndedPopup?.visible && (
-            <div className="fixed top-8 left-1/2 z-50 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl border-2 border-red-300 animate-fade-in text-lg font-semibold flex items-center space-x-2">
-              <PhoneOff className="w-6 h-6 mr-2" />
-              <span>{showEndedPopup.name ? `${showEndedPopup.name} ended the call` : "The other user ended the call"}</span>
-            </div>
-          )}
 
           {/* Controls */}
           {matchState === "chatting" && (
