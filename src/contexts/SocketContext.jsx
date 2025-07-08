@@ -25,7 +25,7 @@ export const SocketProvider = ({ children }) => {
     // Initialize socket connection with HTTPS
     const SOCKET_SERVER_URL = import.meta.env.VITE_API_URL
       ? import.meta.env.VITE_API_URL.replace('/api', '')
-      : 'https://vercel-backend-psi-sooty.vercel.app';
+      : 'https://vercel-backend-production-e3cb.up.railway.app';
       
     const newSocket = io(SOCKET_SERVER_URL, {
       query: { userId },
