@@ -26,8 +26,13 @@ export const SocketProvider = ({ children }) => {
     const SOCKET_SERVER_URL = import.meta.env.VITE_API_URL
       ? import.meta.env.VITE_API_URL.replace('/api', '')
       : 'https://vercel-backend-production-e3cb.up.railway.app';
-      
+    
+    // Debug: Log the socket server URL and userId
+    console.log('[SocketContext] SOCKET_SERVER_URL:', SOCKET_SERVER_URL);
+    console.log('[SocketContext] Connecting with userId:', userId);
+
     const newSocket = io(SOCKET_SERVER_URL, {
+
       query: { userId },
       withCredentials: true,
       secure: true,
