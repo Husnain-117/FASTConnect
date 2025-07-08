@@ -1,22 +1,43 @@
 "use client"
-
 import Navbar from "./Navbar"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useAuth } from "../context/AuthContext"
 import { useSocket } from "../contexts/SocketContext"
-import { Video, VideoOff, Mic, MicOff, Phone, PhoneOff, Users, Search, SkipForward, Camera, X } from "lucide-react"
-  
+import {
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  Phone,
+  PhoneOff,
+  Users,
+  Search,
+  SkipForward,
+  Camera,
+  X,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react"
+
 const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
     { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
   ],
 }
 
 type MatchState = "idle" | "searching" | "matched" | "waiting" | "chatting"
+type ConnectionState = "connecting" | "connected" | "failed" | "disconnected"
+type ErrorType = "media" | "connection" | "peer" | "ice" | "general"
+
+interface ConnectionError {
+  type: ErrorType
+  message: string
+  canRetry: boolean
+}
 
 const VideoChat = () => {
-  
   const [isRunning, setIsRunning] = useState(false)
   const [connected, setConnected] = useState(false)
   const [otherUser, setOtherUser] = useState<any>(null)
@@ -25,21 +46,289 @@ const VideoChat = () => {
   const [usersInRoom, setUsersInRoom] = useState<{ id: string; name: string; email: string }[]>([])
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
+
+  // Enhanced connection state management
+  const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected")
+  const [connectionError, setConnectionError] = useState<ConnectionError | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [systemMessage, setSystemMessage] = useState<string | null>(null)
+
   const localStreamRef = useRef<MediaStream | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
   const localVideoRef = useRef<HTMLVideoElement | null>(null)
   const peerRef = useRef<RTCPeerConnection | null>(null)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const { user } = useAuth()
   const { socket } = useSocket()
-  const [systemMessage, setSystemMessage] = useState<string | null>(null)
 
+  const MAX_RETRY_ATTEMPTS = 3
+  const RETRY_DELAYS = [2000, 5000, 10000] // Progressive delays
+
+  // Enhanced cleanup function
+  const cleanupConnection = useCallback(() => {
+    console.log("[VideoChat] Cleaning up connection...")
+
+    // Clear timeouts
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current)
+      connectionTimeoutRef.current = null
+    }
+
+    // Close peer connection
+    if (peerRef.current) {
+      peerRef.current.onicecandidate = null
+      peerRef.current.ontrack = null
+      peerRef.current.onconnectionstatechange = null
+      peerRef.current.onicegatheringstatechange = null
+      peerRef.current.onsignalingstatechange = null
+      peerRef.current.close()
+      peerRef.current = null
+    }
+
+    // Stop all local media tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log(`[VideoChat] Stopped ${track.kind} track`)
+      })
+      localStreamRef.current = null
+    }
+
+    // Clean up video elements
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null
+      remoteVideoRef.current.pause()
+    }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null
+      localVideoRef.current.pause()
+    }
+
+    setConnectionState("disconnected")
+  }, [])
+
+  // Enhanced error handling
+  const handleConnectionError = useCallback(
+    (error: ConnectionError) => {
+      console.error(`[VideoChat] ${error.type} error:`, error.message)
+      setConnectionError(error)
+      setConnectionState("failed")
+
+      if (error.canRetry && retryCount < MAX_RETRY_ATTEMPTS) {
+        setIsRetrying(true)
+        const delay = RETRY_DELAYS[retryCount] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
+
+        setSystemMessage(
+          `Connection failed. Retrying in ${delay / 1000} seconds... (${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`,
+        )
+
+        retryTimeoutRef.current = setTimeout(() => {
+          retryConnection()
+        }, delay)
+      } else {
+        setSystemMessage(error.message + (error.canRetry ? " Please try again manually." : ""))
+        setIsRetrying(false)
+      }
+    },
+    [retryCount],
+  )
+
+  // Retry connection logic
+  const retryConnection = useCallback(async () => {
+    if (matchState !== "chatting" || !otherUser) {
+      setIsRetrying(false)
+      return
+    }
+
+    console.log(`[VideoChat] Retrying connection (attempt ${retryCount + 1})`)
+    setRetryCount((prev) => prev + 1)
+    setConnectionError(null)
+    setSystemMessage("Reconnecting...")
+
+    // Clean up previous connection
+    cleanupConnection()
+
+    // Small delay before retry
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    // Restart connection setup
+    setupWebRTCConnection()
+  }, [matchState, otherUser, retryCount, cleanupConnection])
+
+  // Manual retry function
+  const handleManualRetry = useCallback(() => {
+    setRetryCount(0)
+    setConnectionError(null)
+    setIsRetrying(false)
+    retryConnection()
+  }, [retryConnection])
+
+  // Enhanced WebRTC setup
+  const setupWebRTCConnection = useCallback(async () => {
+    if (!socket || !user || matchState !== "chatting" || !otherUser) return
+
+    try {
+      setConnectionState("connecting")
+      setSystemMessage("Connecting...")
+
+      // Set connection timeout
+      connectionTimeoutRef.current = setTimeout(() => {
+        handleConnectionError({
+          type: "connection",
+          message: "Connection timeout. The connection took too long to establish.",
+          canRetry: true,
+        })
+      }, 30000) // 30 second timeout
+
+      const isInitiator = socket.id && otherUser && socket.id < otherUser
+
+      // Get user media with enhanced error handling
+      let localStream: MediaStream
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
+          },
+        })
+        localStreamRef.current = localStream
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream
+        }
+      } catch (mediaError: any) {
+        let errorMessage = "Failed to access camera/microphone. "
+        if (mediaError.name === "NotReadableError") {
+          errorMessage += "Device is already in use by another application."
+        } else if (mediaError.name === "NotAllowedError") {
+          errorMessage += "Permission denied. Please allow camera and microphone access."
+        } else if (mediaError.name === "NotFoundError") {
+          errorMessage += "No camera or microphone found."
+        } else {
+          errorMessage += mediaError.message || "Unknown media error."
+        }
+
+        handleConnectionError({
+          type: "media",
+          message: errorMessage,
+          canRetry: mediaError.name !== "NotAllowedError",
+        })
+        return
+      }
+
+      // Create peer connection with enhanced configuration
+      const peer = new RTCPeerConnection({
+        ...ICE_SERVERS,
+        iceCandidatePoolSize: 10,
+      })
+      peerRef.current = peer
+
+      // Add local stream tracks
+      localStream.getTracks().forEach((track) => {
+        peer.addTrack(track, localStream)
+      })
+
+      // Enhanced peer connection event handlers
+      peer.onicecandidate = (event) => {
+        if (event.candidate && otherUser) {
+          socket.emit("ice-candidate", { candidate: event.candidate, to: otherUser })
+        }
+      }
+
+      peer.ontrack = (event) => {
+        const [remoteStream] = event.streams
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStream) {
+          remoteVideoRef.current.srcObject = remoteStream
+          remoteVideoRef.current.play().catch((e) => {
+            if (e.name !== "AbortError") {
+              console.error("[VideoChat] Error playing remote video:", e)
+            }
+          })
+        }
+      }
+
+      peer.onconnectionstatechange = () => {
+        console.log(`[VideoChat] Connection state: ${peer.connectionState}`)
+
+        switch (peer.connectionState) {
+          case "connected":
+            setConnectionState("connected")
+            setConnected(true)
+            setRetryCount(0)
+            setConnectionError(null)
+            setIsRetrying(false)
+            setSystemMessage(null)
+            if (connectionTimeoutRef.current) {
+              clearTimeout(connectionTimeoutRef.current)
+              connectionTimeoutRef.current = null
+            }
+            break
+          case "connecting":
+            setConnectionState("connecting")
+            break
+          case "disconnected":
+          case "failed":
+          case "closed":
+            if (matchState === "chatting") {
+              handleConnectionError({
+                type: "connection",
+                message: "Connection lost. Attempting to reconnect...",
+                canRetry: true,
+              })
+            }
+            break
+        }
+      }
+
+      peer.onicegatheringstatechange = () => {
+        console.log(`[VideoChat] ICE gathering state: ${peer.iceGatheringState}`)
+      }
+
+      peer.onsignalingstatechange = () => {
+        console.log(`[VideoChat] Signaling state: ${peer.signalingState}`)
+      }
+
+      // Handle offer/answer exchange
+      if (isInitiator) {
+        try {
+          const offer = await peer.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          })
+          await peer.setLocalDescription(offer)
+          socket.emit("offer", { offer, to: otherUser })
+        } catch (error: any) {
+          handleConnectionError({
+            type: "peer",
+            message: "Failed to create offer: " + error.message,
+            canRetry: true,
+          })
+        }
+      }
+    } catch (error: any) {
+      handleConnectionError({
+        type: "general",
+        message: "Failed to setup connection: " + error.message,
+        canRetry: true,
+      })
+    }
+  }, [socket, user, matchState, otherUser, handleConnectionError])
+
+  // Socket event handlers for video chat
   useEffect(() => {
     if (!socket || !user) return
 
     const userInfo = { id: user._id, name: user.name, email: user.email }
     socket.emit("join-video-chat", userInfo)
-    isRunning;
-    connected;
 
     const handleVideoChatUsers = (users: any) => {
       setUsersInRoom(users)
@@ -53,27 +342,76 @@ const VideoChat = () => {
     }
   }, [socket, user])
 
+  // Enhanced socket event handlers
   useEffect(() => {
     if (!socket) return
+
+    const handleOffer = async ({ offer, from }: { offer: any; from: string }) => {
+      if (!peerRef.current) return
+      try {
+        await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer))
+        const answer = await peerRef.current.createAnswer()
+        await peerRef.current.setLocalDescription(answer)
+        socket.emit("answer", { answer, to: from })
+      } catch (error: any) {
+        handleConnectionError({
+          type: "peer",
+          message: "Failed to handle offer: " + error.message,
+          canRetry: true,
+        })
+      }
+    }
+
+    const handleAnswer = async ({ answer }: { answer: any }) => {
+      if (!peerRef.current) return
+      try {
+        if (peerRef.current.signalingState !== "stable") {
+          await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer))
+        }
+      } catch (error: any) {
+        if (error.name !== "InvalidStateError") {
+          handleConnectionError({
+            type: "peer",
+            message: "Failed to handle answer: " + error.message,
+            canRetry: true,
+          })
+        }
+      }
+    }
+
+    const handleIceCandidate = async ({ candidate }: { candidate: any }) => {
+      if (!peerRef.current) return
+      try {
+        await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate))
+      } catch (error: any) {
+        console.warn("[VideoChat] Failed to add ICE candidate:", error)
+      }
+    }
 
     socket.on("video-match-found", ({ peerId, peerInfo }: { peerId: string; peerInfo: any }) => {
       setMatchState("matched")
       setMatchPeer({ peerId, ...peerInfo })
+      setRetryCount(0)
+      setConnectionError(null)
     })
 
     socket.on("video-chat-start", ({ peerId }: { peerId: string }) => {
       setMatchState("chatting")
       setOtherUser(peerId)
-      setConnected(true)
       setIsRunning(true)
+      setRetryCount(0)
+      setConnectionError(null)
     })
 
     socket.on("video-chat-skip", (data?: { by?: string; name?: string }) => {
+      cleanupConnection()
       setMatchState("searching")
       setMatchPeer(null)
       setOtherUser(null)
       setConnected(false)
       setIsRunning(false)
+      setRetryCount(0)
+      setConnectionError(null)
       if (data && data.name) {
         setSystemMessage(`${data.name} skipped the chat.`)
       } else {
@@ -83,15 +421,18 @@ const VideoChat = () => {
     })
 
     socket.on("video-chat-ended", (data?: { by?: string; name?: string }) => {
+      cleanupConnection()
       setMatchState("idle")
       setMatchPeer(null)
       setOtherUser(null)
       setConnected(false)
       setIsRunning(false)
+      setRetryCount(0)
+      setConnectionError(null)
       if (data && data.name) {
         setSystemMessage(`${data.name} ended the chat.`)
       } else {
-        setSystemMessage("The other user ended the call. You can now start a new chat or close this window.")
+        setSystemMessage("The other user ended the call.")
       }
     })
 
@@ -99,152 +440,33 @@ const VideoChat = () => {
       setMatchState("waiting")
     })
 
+    socket.on("offer", handleOffer)
+    socket.on("answer", handleAnswer)
+    socket.on("ice-candidate", handleIceCandidate)
+
     return () => {
       socket.off("video-match-found")
       socket.off("video-chat-start")
       socket.off("video-chat-skip")
       socket.off("video-waiting-peer-response")
       socket.off("video-chat-ended")
-    }
-  }, [socket])
-
-  useEffect(() => {
-    if (!socket || !user) return
-    if (matchState !== "chatting" || !otherUser) return
-
-    let isInitiator = false
-    if (socket.id && otherUser) {
-      isInitiator = socket.id < otherUser
-    }
-
-    let peer: RTCPeerConnection
-    let localStream: MediaStream
-    let cleanup = false
-
-    const setupConnection = async () => {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        localStreamRef.current = localStream
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStream
-          cleanup;
-        }
-
-        peer = new RTCPeerConnection(ICE_SERVERS)
-        peerRef.current = peer
-
-        localStream.getTracks().forEach((track) => peer.addTrack(track, localStream))
-
-        peer.onicecandidate = (event) => {
-          if (event.candidate && otherUser) {
-            socket.emit("ice-candidate", { candidate: event.candidate, to: otherUser })
-          }
-        }
-
-        peer.ontrack = (event) => {
-          const [remoteStream] = event.streams
-          if (remoteVideoRef.current) {
-            if (remoteVideoRef.current.srcObject !== remoteStream) {
-              remoteVideoRef.current.srcObject = remoteStream
-              remoteVideoRef.current.play().catch((e) => {
-                if (e.name !== "AbortError") {
-                  console.error("[VideoChat] Error playing remote video:", e)
-                }
-              })
-            }
-          }
-        }
-
-        peer.onconnectionstatechange = () => {
-          if (
-            peer.connectionState === "disconnected" ||
-            peer.connectionState === "failed" ||
-            peer.connectionState === "closed"
-          ) {
-            stopVideoChat()
-          }
-        }
-
-        if (isInitiator) {
-          const offer = await peer.createOffer()
-          await peer.setLocalDescription(offer)
-          socket.emit("offer", { offer, to: otherUser })
-        }
-      } catch (err: any) {
-        if (err.name === "NotReadableError") {
-          alert("Camera or microphone is already in use by another application. Please close other apps or tabs and try again.");
-        }
-        console.error("[VideoChat] Error setting up WebRTC:", err);
-      }
-    }
-
-    const handleOffer = async ({ offer, from }: { offer: any; from: string }) => {
-      if (!peerRef.current) return
-      await peerRef.current.setRemoteDescription(new window.RTCSessionDescription(offer))
-      const answer = await peerRef.current.createAnswer()
-      if (peerRef.current.signalingState === "have-remote-offer") {
-        await peerRef.current.setLocalDescription(answer)
-        socket.emit("answer", { answer, to: from })
-      } else {
-        console.warn("[VideoChat] Tried to set local answer in wrong signaling state:", peerRef.current.signalingState)
-      }
-    }
-
-    const handleAnswer = async ({ answer }: { answer: any }) => {
-      if (!peerRef.current) return
-      try {
-        if (peerRef.current.signalingState !== "stable") {
-          await peerRef.current.setRemoteDescription(new window.RTCSessionDescription(answer))
-        }
-      } catch (e: any) {
-        if (e.name !== "InvalidStateError") {
-          console.error("[VideoChat] Error setting remote answer:", e)
-        }
-      }
-    }
-
-    const handleIceCandidate = async ({ candidate }: { candidate: any }) => {
-      if (!peerRef.current) return
-      try {
-        await peerRef.current.addIceCandidate(new window.RTCIceCandidate(candidate))
-      } catch (err) {
-        console.error("[VideoChat] Failed to add ICE candidate:", err)
-      }
-    }
-
-    socket.on("offer", handleOffer)
-    socket.on("answer", handleAnswer)
-    socket.on("ice-candidate", handleIceCandidate)
-
-    setupConnection()
-
-    return () => {
-      cleanup = true
       socket.off("offer", handleOffer)
       socket.off("answer", handleAnswer)
       socket.off("ice-candidate", handleIceCandidate)
+    }
+  }, [socket, handleConnectionError, cleanupConnection])
 
-      // Clean up peer connection
-      if (peerRef.current) {
-        peerRef.current.close();
-        peerRef.current = null;
-      }
-
-      // Stop all local media tracks
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-        localStreamRef.current = null;
-      }
-
-      // Clean up video elements
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
+  // Setup WebRTC when chatting starts
+  useEffect(() => {
+    if (matchState === "chatting" && otherUser) {
+      setupWebRTCConnection()
+    }
+    return () => {
+      if (matchState !== "chatting") {
+        cleanupConnection()
       }
     }
-  }, [matchState, otherUser])
+  }, [matchState, otherUser, setupWebRTCConnection, cleanupConnection])
 
   const handleStartSearch = () => {
     if (!socket || matchState === "searching" || matchState === "chatting") return
@@ -254,6 +476,9 @@ const VideoChat = () => {
     setConnected(false)
     setIsRunning(false)
     setSystemMessage(null)
+    setRetryCount(0)
+    setConnectionError(null)
+    cleanupConnection()
     socket.emit("start-video-search")
   }
 
@@ -264,6 +489,7 @@ const VideoChat = () => {
     setOtherUser(null)
     setConnected(false)
     setIsRunning(false)
+    cleanupConnection()
     socket.emit("stop-video-search")
   }
 
@@ -276,40 +502,24 @@ const VideoChat = () => {
       setOtherUser(null)
       setConnected(false)
       setIsRunning(false)
+      cleanupConnection()
     } else {
       setMatchState("waiting")
     }
   }
 
   const stopVideoChat = () => {
+    if (socket && otherUser) {
+      socket.emit("video-chat-ended", { to: otherUser, name: user?.name })
+    }
+    cleanupConnection()
     setIsRunning(false)
     setConnected(false)
     setOtherUser(null)
     setMatchState("idle")
     setMatchPeer(null)
-
-    if (peerRef.current) {
-      peerRef.current.close()
-      peerRef.current = null
-    }
-
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop())
-      localStreamRef.current = null
-    }
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null
-    }
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null
-    }
-
-    if (socket && otherUser) {
-      socket.emit("video-chat-ended", { to: otherUser, name: user?.name })
-    }
-
+    setRetryCount(0)
+    setConnectionError(null)
     setSystemMessage("You ended the chat.")
   }
 
@@ -333,7 +543,6 @@ const VideoChat = () => {
     }
   }
 
- 
   return (
     <div className="h-screen bg-[#051622] flex flex-col overflow-hidden">
       {/* Animated Background */}
@@ -360,8 +569,8 @@ const VideoChat = () => {
 
       <Navbar />
 
-     {/* Main Content */}
-     <div className="flex-1 flex flex-col relative z-10">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col relative z-10">
         {/* Header - Only Online Users */}
         <div className="bg-[#051622]/90 backdrop-blur-sm px-6 py-4">
           <div className="max-w-4xl mx-auto flex items-center justify-end">
@@ -380,8 +589,42 @@ const VideoChat = () => {
           {/* System Message */}
           {systemMessage && (
             <div className="p-4 text-center">
-              <div className="inline-block bg-red-900/20 backdrop-blur-sm border border-red-500/30 text-red-200 px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
+              <div
+                className={`inline-block backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium shadow-lg ${
+                  connectionError
+                    ? "bg-red-900/20 border border-red-500/30 text-red-200"
+                    : "bg-blue-900/20 border border-blue-500/30 text-blue-200"
+                }`}
+              >
                 {systemMessage}
+              </div>
+            </div>
+          )}
+
+          {/* Connection Error Display */}
+          {connectionError && (
+            <div className="p-4 text-center">
+              <div className="inline-block bg-red-900/20 backdrop-blur-sm border border-red-500/30 rounded-lg p-4 max-w-md">
+                <div className="flex items-center justify-center mb-2">
+                  <AlertTriangle className="w-5 h-5 text-red-400 mr-2" />
+                  <span className="text-red-200 font-medium">Connection Error</span>
+                </div>
+                <p className="text-red-200 text-sm mb-3">{connectionError.message}</p>
+                {connectionError.canRetry && !isRetrying && (
+                  <button
+                    onClick={handleManualRetry}
+                    className="inline-flex items-center space-x-2 px-4 py-2 bg-[#1BA098] hover:bg-[#159084] text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retry Connection</span>
+                  </button>
+                )}
+                {isRetrying && (
+                  <div className="flex items-center justify-center space-x-2 text-yellow-200">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Retrying...</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -499,6 +742,16 @@ const VideoChat = () => {
             {/* Chatting State */}
             {matchState === "chatting" && (
               <div className="w-full max-w-6xl mx-auto animate-fade-in">
+                {/* Connection Status Indicator */}
+                {connectionState === "connecting" && (
+                  <div className="text-center mb-4">
+                    <div className="inline-flex items-center space-x-2 px-4 py-2 bg-yellow-900/20 backdrop-blur-sm border border-yellow-500/30 text-yellow-200 rounded-lg text-sm">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Establishing connection...</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Local Video */}
                   <div className="relative group">
@@ -513,7 +766,13 @@ const VideoChat = () => {
                       You
                     </div>
                     <div
-                      className={`absolute bottom-4 right-4 w-4 h-4 rounded-full border-2 border-white shadow-lg ${isVideoOff ? "bg-red-500" : "bg-green-400 animate-pulse"}`}
+                      className={`absolute bottom-4 right-4 w-4 h-4 rounded-full border-2 border-white shadow-lg ${
+                        connectionState === "connected"
+                          ? "bg-green-400 animate-pulse"
+                          : connectionState === "connecting"
+                            ? "bg-yellow-400 animate-pulse"
+                            : "bg-red-500"
+                      }`}
                     ></div>
                     {isVideoOff && (
                       <div className="absolute inset-0 bg-[#051622]/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
@@ -533,7 +792,23 @@ const VideoChat = () => {
                     <div className="absolute top-4 left-4 bg-blue-500/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm font-medium">
                       Connected User
                     </div>
-                    <div className="absolute bottom-4 right-4 w-4 h-4 bg-blue-400 rounded-full animate-pulse border-2 border-white shadow-lg"></div>
+                    <div
+                      className={`absolute bottom-4 right-4 w-4 h-4 rounded-full border-2 border-white shadow-lg ${
+                        connectionState === "connected"
+                          ? "bg-blue-400 animate-pulse"
+                          : connectionState === "connecting"
+                            ? "bg-yellow-400 animate-pulse"
+                            : "bg-red-500"
+                      }`}
+                    ></div>
+                    {connectionState !== "connected" && (
+                      <div className="absolute inset-0 bg-[#051622]/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                        <div className="text-center">
+                          <RefreshCw className="w-16 h-16 text-[#DEB992] animate-spin mx-auto mb-2" />
+                          <p className="text-[#DEB992] text-sm">Connecting...</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -577,9 +852,6 @@ const VideoChat = () => {
           )}
         </div>
       </div>
-
-      {/* Audio Debug (hidden) */}
-      <audio autoPlay className="hidden" />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
