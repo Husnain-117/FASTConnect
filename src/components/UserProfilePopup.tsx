@@ -1,7 +1,9 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
 import { X, Mail, Clock, UserCheck} from "lucide-react"
+import DirectMessageSender from "./DirectMessageSender"
 
 interface UserProfilePopupProps {
   user: {
@@ -16,6 +18,8 @@ interface UserProfilePopupProps {
 }
 
 const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose }) => {
+  const [showDirectMessage, setShowDirectMessage] = useState(false)
+
   const getInitials = (name: string) => {
     return name
       ? name
@@ -25,6 +29,14 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose }) =>
           .toUpperCase()
           .slice(0, 2)
       : "U"
+  }
+
+  const handleSendMessage = () => {
+    setShowDirectMessage(true)
+  }
+
+  const handleCloseDirectMessage = () => {
+    setShowDirectMessage(false)
   }
 
   return (
@@ -112,7 +124,10 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose }) =>
 
           {/* Action Buttons - compact */}
           <div className="flex space-x-2 animate-slide-up-delay-7 w-full">
-            <button className="flex-1 px-3 py-2 bg-gradient-to-r from-[#1BA098] to-[#159084] text-[#051622] rounded-xl font-bold shadow-md hover:shadow-xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#1BA098]/50 active:scale-95 text-sm">
+            <button 
+              onClick={handleSendMessage}
+              className="flex-1 px-3 py-2 bg-gradient-to-r from-[#1BA098] to-[#159084] text-[#051622] rounded-xl font-bold shadow-md hover:shadow-xl transform transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#1BA098]/50 active:scale-95 text-sm"
+            >
               Send Message
             </button>
             <button
@@ -124,6 +139,20 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose }) =>
           </div>
         </div>
       </div>
+
+      {/* Direct Message Sender Modal */}
+      {showDirectMessage && (
+        <DirectMessageSender
+          recipientId={user._id}
+          recipientName={user.name}
+          recipientAvatar={user.avatar}
+          onSent={() => {
+            setShowDirectMessage(false)
+            onClose() // Close the profile popup after sending
+          }}
+          onClose={handleCloseDirectMessage}
+        />
+      )}
 
       <style>{`
         @keyframes fade-in {

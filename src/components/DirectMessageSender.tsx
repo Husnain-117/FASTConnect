@@ -75,8 +75,8 @@ const DirectMessageSender: React.FC<DirectMessageSenderProps> = ({
 
     try {
       await axiosInstance.post(
-        "/messages/send-to-user",
-        { text, recipientId },
+        "https://vercel-backend-production-e3cb.up.railway.app/api/messages/send-to-user",
+        { text, receiverId: recipientId },
       )
 
       setMessageStatus("sent")
@@ -93,7 +93,21 @@ const DirectMessageSender: React.FC<DirectMessageSenderProps> = ({
 
       if (onSent) onSent()
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send message.")
+      console.error('Send message error:', err)
+      
+      // Handle different types of errors
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('ERR_BLOCKED_BY_CLIENT')) {
+        setError("Network error: Please check your connection or disable ad blockers for this site.")
+      } else if (err.response?.status === 401) {
+        setError("Authentication failed. Please log in again.")
+      } else if (err.response?.status === 404) {
+        setError("Server endpoint not found. Please check server configuration.")
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message)
+      } else {
+        setError("Failed to send message. Please try again.")
+      }
+      
       setMessageStatus(null)
     } finally {
       setLoading(false)
