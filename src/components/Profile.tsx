@@ -41,6 +41,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null)
   const [showCropper, setShowCropper] = useState<boolean>(false)
   const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined)
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const fetchProfile = async () => {
     if (!userId) return
@@ -196,6 +198,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
   const onCropAndUpload = async () => {
     if (!selectedImage || !croppedAreaPixels || !userId) return
+    setUploading(true);
+    setProgress(0);
     const croppedBlob = await getCroppedImg(selectedImage, croppedAreaPixels)
     const formData = new FormData()
     formData.append("profilePhoto", croppedBlob, "cropped.jpg")
@@ -219,6 +223,9 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       }
     } catch (err) {
       setError("Error uploading photo")
+    } finally {
+      setUploading(false);
+      setProgress(0);
     }
     setShowCropper(false)
     setSelectedImage(undefined)
@@ -831,11 +838,28 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
                 </button>
                 <button
                   onClick={onCropAndUpload}
+                  disabled={uploading}
                   className="px-6 py-3 bg-gradient-to-r from-[#1BA098] to-[#159084] text-[#051622] rounded-xl font-semibold shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#1BA098]/30"
                 >
-                  Save Photo
+                  {uploading ? "Saving..." : "Save Photo"}
                 </button>
               </div>
+              {uploading && (
+                <div className="w-full mt-4 mb-2">
+                  <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-[#1BA098] via-[#34d399] to-[#159084] h-3 rounded-full animate-pulse"
+                      style={{
+                        width: `${progress}%`,
+                        minWidth: progress > 0 ? "1.5rem" : "0", // ensures visibility at low %
+                        transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)"
+                      }}
+                    />
+                    {/* Optional: Animated stripes overlay */}
+                    <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,#fff3, #fff3 10px,transparent 10px,transparent 20px)] opacity-20 pointer-events-none rounded-full animate-move-stripes" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -907,6 +931,11 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         .animate-slide-up-stagger-1 { animation: slide-up 0.8s ease-out 0.4s both; }
         .animate-slide-up-stagger-2 { animation: slide-up 0.8s ease-out 0.6s both; }
         .animate-slide-up-stagger-3 { animation: slide-up 0.8s ease-out 0.8s both; }
+
+        @keyframes move-stripes {
+          0% { background-position: 0 0; }
+          100% { background-position: 100px 0; } /* Adjust as needed for stripes */
+        }
       `}</style>
     </div>
   )

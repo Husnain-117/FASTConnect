@@ -286,7 +286,7 @@ const TextChat: React.FC = () => {
     fetchOnlineUsers().then(setOnlineUsers)
   }, [token])
 
-  if (loading) {
+  if (loading || !user || !user._id) {
     return (
       <div className="min-h-screen bg-[#051622] flex items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -502,7 +502,13 @@ const TextChat: React.FC = () => {
                       return null // Skip rendering this message if sender data is missing
                     }
 
-                    const isOwnMessage = message.sender._id === user?._id
+                    // Robustly compare sender and user IDs as strings
+                    const senderId = String(message.sender._id)
+                    const userId = String(user._id)
+                    const isOwnMessage = senderId === userId
+                    if (!senderId || !userId) {
+                      console.warn("Message or user ID missing", { senderId, userId, message })
+                    }
                     const showAvatar = index === 0 || filteredMessages[index - 1]?.sender?._id !== message.sender._id
                     return (
                       <div
@@ -530,15 +536,8 @@ const TextChat: React.FC = () => {
 
                           {/* Message Bubble */}
                           <div className="relative">
-                            {/* Sender Name for received messages */}
-                            {!isOwnMessage && showAvatar && (
-                              <button
-                                onClick={(e) => handleUserClick(message.sender, e)}
-                                className="text-xs font-semibold text-[#1BA098] mb-1 ml-3 hover:text-[#159084] transition-colors cursor-pointer"
-                              >
-                                {message.sender?.name || "Unknown User"}
-                              </button>
-                            )}
+                            {/* Sender Name for received messages - REMOVED */}
+                            {/* (was here, now removed as per request) */}
 
                             <div
                               className={`relative px-4 py-3 shadow-lg backdrop-blur-sm border transition-all duration-200 hover:scale-[1.02] ${

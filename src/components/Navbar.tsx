@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { UserIcon, Menu, X } from "lucide-react"
+import { UserIcon, Menu, X, Mail } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 
 const Navbar = () => {
@@ -134,6 +134,22 @@ const Navbar = () => {
                   {user?.name || "Profile"}
                 </span>
               </div>
+
+              {/* Inbox Icon */}
+              <Link
+                to="/text-chat"
+                className="relative group p-2 rounded-lg bg-[#051622]/60 border border-[#1BA098]/30 hover:bg-[#1BA098]/20 hover:border-[#1BA098]/50 hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-[#1BA098]/25"
+                title="Messages"
+              >
+                <Mail className="w-5 h-5 text-[#1BA098]" />
+                {/* Tooltip (optional, remove if not needed) */}
+                {/* 
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-[#051622] border border-[#1BA098]/30 rounded-lg text-xs text-[#DEB992] opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap shadow-xl backdrop-blur-sm">
+                  Not yet implemented, sorry
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-[#051622]"></div>
+                </div>
+                */}
+              </Link>
 
               {/* Logout Button */}
               <button
