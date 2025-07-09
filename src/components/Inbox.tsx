@@ -5,7 +5,7 @@ import axiosInstance from "../api/axiosConfig"
 import { useAuth } from "../context/AuthContext"
 import Navbar from "./Navbar"
 import { useSocket } from "../contexts/SocketContext"
-import API_BASE_URL from "../config/apiBaseUrl"
+
 
 interface Message {
   _id: string
@@ -41,7 +41,7 @@ const Inbox: React.FC = () => {
   const [error, setError] = useState("")
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [newMessage, setNewMessage] = useState("")
-  const { user, token } = useAuth()
+  const { user } = useAuth()
   const { socket } = useSocket()
 
   // Fetch inbox data
