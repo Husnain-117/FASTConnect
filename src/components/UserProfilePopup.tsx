@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { X, Mail, Clock, UserCheck, CircleX } from "lucide-react"
+import { X, Mail, Clock, UserCheck} from "lucide-react"
 
 interface UserProfilePopupProps {
   user: {
