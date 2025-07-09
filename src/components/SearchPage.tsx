@@ -631,17 +631,17 @@ const Search = () => {
                   </div>
                   {/* Favorite Star */}
                   <button
-                    onClick={() => toggleFavorite(profile._id)}
+                    onClick={() => profile._id && toggleFavorite(profile._id)}
                     className="group p-2 text-[#DEB992]/40 hover:text-[#1BA098] transition-all duration-300 transform hover:scale-125 focus:outline-none focus:ring-2 focus:ring-[#1BA098]/30 rounded-full"
                     disabled={favoritesLoading}
                   >
                     <svg
                       className={`w-6 h-6 transition-all duration-300 ${
-                        isFavorited(profile._id)
+                        profile._id && isFavorited(profile._id)
                           ? "text-[#1BA098] fill-current transform scale-110"
                           : "text-[#DEB992]/40 hover:text-[#1BA098] group-hover:scale-110"
                       }`}
-                      fill={isFavorited(profile._id) ? "currentColor" : "none"}
+                      fill={profile._id && isFavorited(profile._id) ? "currentColor" : "none"}
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >

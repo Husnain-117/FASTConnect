@@ -99,6 +99,7 @@ const TextChat: React.FC = () => {
   const isInputDisabled = () => {
     return filter !== "today" && filter !== "all"
   }
+  onlineUsersError;
   // Helper function to get the disabled message
   const getDisabledMessage = () => {
     if (filter === "today" || filter === "all") return ""
