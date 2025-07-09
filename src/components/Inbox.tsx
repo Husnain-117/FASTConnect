@@ -7,32 +7,31 @@ import Navbar from "./Navbar"
 import { useSocket } from "../contexts/SocketContext"
 
 
+interface Sender {
+  _id?: string;
+  id?: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
 interface Message {
-  _id: string
-  text: string
-  sender: {
-    _id: string
-    name: string
-    email: string
-    avatar?: string
-  }
-  receiver: {
-    _id: string
-    name: string
-    email: string
-    avatar?: string
-  }
-  timestamp: string
+  _id: string;
+  text: string;
+  sender: Sender;
+  receiver: Sender;
+  timestamp: string;
 }
 
 interface Conversation {
   user: {
-    _id: string
-    name: string
-    email: string
-    avatar?: string
-  }
-  messages: Message[]
+    _id?: string; // was _id: string
+    id?: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  messages: Message[];
 }
 
 const Inbox: React.FC = () => {
@@ -75,35 +74,27 @@ const Inbox: React.FC = () => {
       
       // Update conversations with new message
       setConversations(prev => {
-        const updated = [...prev]
-        const conversationIndex = updated.findIndex(conv => 
+        const updated = [...prev];
+        const conversationIndex = updated.findIndex(conv =>
           conv.user._id === message.sender._id || conv.user._id === message.receiver._id
-        )
-        
+        );
+
         if (conversationIndex !== -1) {
-          // Add message to existing conversation
-          updated[conversationIndex].messages.push(message)
+          const messages = updated[conversationIndex].messages;
+          // Only add if not already the last message
+          if (messages.length === 0 || messages[messages.length - 1]._id !== message._id) {
+            updated[conversationIndex].messages.push(message);
+          }
         } else {
-          // Create new conversation
-          const otherUser = message.sender._id === user?._id ? message.receiver : message.sender
+          const otherUser = message.sender._id === user?._id ? message.receiver : message.sender;
           updated.unshift({
             user: otherUser,
             messages: [message]
-          })
+          });
         }
-        
-        return updated
-      })
 
-      // Update selected conversation if it's the same user
-      if (selectedConversation && 
-          (selectedConversation.user._id === message.sender._id || 
-           selectedConversation.user._id === message.receiver._id)) {
-        setSelectedConversation(prev => prev ? {
-          ...prev,
-          messages: [...prev.messages, message]
-        } : null)
-      }
+        return updated;
+      });
     }
 
     socket.on("new_direct_message", handleNewDirectMessage)
@@ -111,7 +102,7 @@ const Inbox: React.FC = () => {
     return () => {
       socket.off("new_direct_message", handleNewDirectMessage)
     }
-  }, [socket, selectedConversation, user])
+  }, [socket, user])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -183,6 +174,11 @@ const Inbox: React.FC = () => {
       </div>
     )
   }
+
+  const selectedConv = conversations.find(
+    conv => conv.user._id === selectedConversation?.user._id
+  );
+  const messagesToShow = selectedConv ? selectedConv.messages : [];
 
   return (
     <div className="h-screen bg-[#051622] flex flex-col">
@@ -301,12 +297,20 @@ const Inbox: React.FC = () => {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {selectedConversation.messages.map((message) => {
-                  const isOwnMessage = message.sender._id === user?._id
-                  
+                {messagesToShow.map((message, index) => {
+                  if (!message || !message.sender) {
+                    return null;
+                  }
+                  // Robustly compare sender and user IDs as strings
+                  const senderId = String(message.sender._id || message.sender.id);
+                  const userId = String(user?._id || user?.id);
+                  const isOwnMessage = senderId === userId;
+                  if (!senderId || !userId) {
+                    console.warn("Message or user ID missing", { senderId, userId, message });
+                  }
                   return (
                     <div
-                      key={message._id}
+                      key={message._id || `message-${index}`}
                       className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                     >
                       <div
@@ -316,13 +320,13 @@ const Inbox: React.FC = () => {
                             : "bg-[#051622]/80 border border-[#1BA098]/20 text-[#DEB992]"
                         }`}
                       >
-                        <p className="text-sm">{message.text}</p>
+                        <p className="text-sm">{message.text || "Message content unavailable"}</p>
                         <p className={`text-xs mt-1 ${isOwnMessage ? "text-white/70" : "text-[#DEB992]/50"}`}>
                           {formatTime(message.timestamp)}
                         </p>
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
 

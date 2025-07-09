@@ -34,24 +34,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
+    console.log("AuthProvider: storedToken", storedToken);
     if (storedToken) {
       setToken(storedToken);
-      
-      // Fetch user data
       axiosInstance.get('/auth/me')
         .then(response => {
+          console.log("AuthProvider: /auth/me response", response.data);
           setUser(response.data.user);
         })
         .catch(error => {
           console.error('Error fetching user data:', error);
           localStorage.removeItem('token');
           setToken(null);
+          setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    console.log("AuthProvider: user", user, "loading", loading, "token", token);
+  }, [user, loading, token]);
 
   const login = async (email: string, password: string) => {
     try {

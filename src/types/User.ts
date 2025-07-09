@@ -1,17 +1,18 @@
 export interface User {
-  _id: string
-  name: string
-  email: string
-  campus: string
+  _id?: string;
+  id?: string;
+  name: string;
+  email: string;
+  campus: string;
   batch: {
-    year: string
-  }
+    year: string;
+  };
   department: {
-    name: string
-  }
-  isVerified: boolean
-  lastActive: string | null
-  lastSeen?: string | null  // Added optional lastSeen field
-  isOnline: boolean
-  avatar?: string
+    name: string;
+  };
+  isVerified: boolean;
+  lastActive: string | null;
+  lastSeen?: string | null;  // Added optional lastSeen field
+  isOnline: boolean;
+  avatar?: string;
 }

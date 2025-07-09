@@ -8,6 +8,7 @@ import { useSocket } from "../contexts/SocketContext"
 import EmojiPicker, { Theme } from "emoji-picker-react"
 import API_BASE_URL from "../config/apiBaseUrl"
 import UserProfilePopup from "./UserProfilePopup"
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   _id: string
@@ -78,7 +79,8 @@ const TextChat: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const { socket } = useSocket()
-  const { user, token } = useAuth()
+  const { user, token, loading: authLoading } = useAuth()
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null)
   const [filter, setFilter] = useState<string>("all")
   const [customStart] = useState<string>("")
@@ -97,7 +99,6 @@ const TextChat: React.FC = () => {
   const isInputDisabled = () => {
     return filter !== "today" && filter !== "all"
   }
-
   // Helper function to get the disabled message
   const getDisabledMessage = () => {
     if (filter === "today" || filter === "all") return ""
@@ -128,22 +129,29 @@ const TextChat: React.FC = () => {
     setSelectedUser(null)
   }
 
-  // Fetch initial messages
+  // Use a robust userId getter
+  const userId = user?._id || user?.id;
+
   useEffect(() => {
+    if (authLoading) return; // Wait for auth to finish loading
+    if (!userId || !token) return; // Wait for both user and token
+
     const fetchMessages = async () => {
       try {
-        const response = await axiosInstance.get("/messages/all")
-        setMessages(response.data.messages || [])
+        setLoading(true);
+        setError("");
+        const response = await axiosInstance.get("/messages/all");
+        setMessages(response.data.messages || []);
       } catch (err) {
-        setError("Failed to load messages")
-        console.error("Error fetching messages:", err)
+        setError("Failed to load messages");
+        console.error("Error fetching messages:", err);
       } finally {
-        setLoading(false)
-        onlineUsersError
+        setLoading(false);
       }
-    }
-    fetchMessages()
-  }, [])
+    };
+
+    fetchMessages();
+  }, [authLoading, userId, token]);
 
   // Set up socket event listeners
   useEffect(() => {
@@ -286,7 +294,20 @@ const TextChat: React.FC = () => {
     fetchOnlineUsers().then(setOnlineUsers)
   }, [token])
 
-  if (loading || !user || !user._id) {
+  // Redirect to login only after authLoading is false and user is not set
+  useEffect(() => {
+    if (!authLoading && (!user || !userId)) {
+      navigate("/login");
+    }
+  }, [authLoading, user, userId, navigate]);
+
+  // Debug log for authentication state
+  useEffect(() => {
+    console.log("TextChat: user", user, "authLoading", authLoading, "token", token);
+  }, [user, authLoading, token]);
+
+  // Show loading if auth is still loading or we're fetching messages
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-[#051622] flex items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -316,7 +337,12 @@ const TextChat: React.FC = () => {
           <p style={{ color: "#DEB992", opacity: 0.8 }}>Please wait while we connect you</p>
         </div>
       </div>
-    )
+    );
+  }
+
+  // Don't render anything if redirecting
+  if (!user || !userId) {
+    return null;
   }
 
   return (
@@ -457,15 +483,23 @@ const TextChat: React.FC = () => {
           {/* Error Message - Fixed */}
           {error && (
             <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-red-900/20 backdrop-blur-sm border border-red-500/30 rounded-xl animate-slide-in">
-              <div className="flex items-center">
-                <svg className="w-4 h-4 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span className="text-red-200 text-sm">{error}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-red-200 text-sm">{error}</span>
+                </div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition-colors"
+                >
+                  Retry
+                </button>
               </div>
             </div>
           )}
@@ -497,19 +531,17 @@ const TextChat: React.FC = () => {
               ) : (
                 filteredMessages
                   .map((message, index) => {
-                    // Add null checks for message and sender
                     if (!message || !message.sender) {
-                      return null // Skip rendering this message if sender data is missing
+                      return null;
                     }
-
                     // Robustly compare sender and user IDs as strings
-                    const senderId = String(message.sender._id)
-                    const userId = String(user._id)
-                    const isOwnMessage = senderId === userId
+                    const senderId = String(message.sender._id );
+                    const userId = String(user?._id || user?.id);
+                    const isOwnMessage = senderId === userId;
                     if (!senderId || !userId) {
-                      console.warn("Message or user ID missing", { senderId, userId, message })
+                      console.warn("Message or user ID missing", { senderId, userId, message });
                     }
-                    const showAvatar = index === 0 || filteredMessages[index - 1]?.sender?._id !== message.sender._id
+                    const showAvatar = index === 0 || filteredMessages[index - 1]?.sender?._id !== message.sender._id;
                     return (
                       <div
                         key={message._id || `message-${index}`}
@@ -586,7 +618,7 @@ const TextChat: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    )
+                    );
                   })
                   .filter(Boolean)
               )}

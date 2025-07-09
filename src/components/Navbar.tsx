@@ -36,7 +36,6 @@ const Navbar = () => {
     { href: "/videochat", label: "Video Chat" },
     { href: "/voice-chat", label: "Voice Chat" },
     { href: "/text-chat", label: "Text Chat" },
-    { href: "/inbox", label: "Inbox" },
     { href: "/search", label: "Search" },
     { href: "/about", label: "About" },
   ]
