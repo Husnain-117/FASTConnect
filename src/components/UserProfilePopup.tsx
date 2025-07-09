@@ -2,7 +2,7 @@
 
 import React from "react"
 import { X, Mail, User, Clock } from "lucide-react"
-import DirectMessageSender from "./DirectMessageSender"
+// import DirectMessageSender from "./DirectMessageSender"
 
 interface UserProfilePopupProps {
   user: {
@@ -18,7 +18,7 @@ interface UserProfilePopupProps {
 const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose, anchorPosition }) => {
   const [showDM, setShowDM] = React.useState(false)
   const handleSendMessage = () => setShowDM(true)
-  const handleCloseDM = () => setShowDM(false)
+  // const handleCloseDM = () => setShowDM(false)
 
   const getInitials = (name: string) => {
     return name
@@ -142,14 +142,14 @@ const UserProfilePopup: React.FC<UserProfilePopupProps> = ({ user, onClose, anch
           </div>
         </div>
       )}
-      {showDM && (
-        <DirectMessageSender
-          recipientId={user._id}
-          recipientName={user.name}
-          recipientAvatar={user.avatar}
-          onClose={handleCloseDM}
-        />
-      )}
+      {/* {showDM && (
+        // <DirectMessageSender
+        //   recipientId={user._id}
+        //   recipientName={user.name}
+        //   recipientAvatar={user.avatar}
+        //   onClose={handleCloseDM}
+        // />
+      )} */}
       <style>{``}</style>
     </>
   )
