@@ -1,14 +1,13 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import axiosInstance from "../api/axiosConfig"
 import { useAuth } from "../context/AuthContext"
 import Navbar from "./Navbar"
 import { useSocket } from "../contexts/SocketContext"
-import Picker from "@emoji-mart/react"
-import data from "@emoji-mart/data"
+import EmojiPicker, { Theme } from "emoji-picker-react"
 import API_BASE_URL from "../config/apiBaseUrl"
+import UserProfilePopup from "./UserProfilePopup"
 
 interface Message {
   _id: string
@@ -90,16 +89,43 @@ const TextChat: React.FC = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
 
+  // Profile popup state
+  const [selectedUser, setSelectedUser] = useState<Message["sender"] | null>(null)
+  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
   // Helper function to check if input should be disabled
   const isInputDisabled = () => {
     return filter !== "today" && filter !== "all"
   }
-  onlineUsersError;
 
   // Helper function to get the disabled message
   const getDisabledMessage = () => {
     if (filter === "today" || filter === "all") return ""
     return "Switch to 'Today' or 'All' to send messages"
+  }
+
+  // Handle user profile click
+  const handleUserClick = (userInfo: Message["sender"], event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    // Add null check for userInfo
+    if (!userInfo || !userInfo._id) {
+      console.warn("Cannot show profile: user information is missing")
+      return
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    setPopupPosition({
+      x: rect.left + rect.width + 10,
+      y: rect.top,
+    })
+    setSelectedUser(userInfo)
+  }
+
+  // Close profile popup
+  const closeProfilePopup = () => {
+    setSelectedUser(null)
   }
 
   // Fetch initial messages
@@ -113,6 +139,7 @@ const TextChat: React.FC = () => {
         console.error("Error fetching messages:", err)
       } finally {
         setLoading(false)
+        onlineUsersError
       }
     }
     fetchMessages()
@@ -128,11 +155,9 @@ const TextChat: React.FC = () => {
     }
 
     socket.on("new_message", handleNewMessage)
-
     socket.on("connect", () => {
       // Optionally re-fetch messages or notify user
     })
-
     socket.on("disconnect", () => {
       // Optionally notify user of disconnect
     })
@@ -148,6 +173,7 @@ const TextChat: React.FC = () => {
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
+
     const isAtBottom = Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10
     if (isAtBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
@@ -166,13 +192,13 @@ const TextChat: React.FC = () => {
 
     container.addEventListener("scroll", handleScroll)
     handleScroll()
-
     return () => container.removeEventListener("scroll", handleScroll)
   }, [])
 
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
+
     const isAtBottom = Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10
     setShowScrollToBottom(!isAtBottom)
   }, [messages])
@@ -189,7 +215,6 @@ const TextChat: React.FC = () => {
 
     const messageText = newMessage
     setNewMessage("")
-
     inputRef.current?.focus()
 
     try {
@@ -235,6 +260,7 @@ const TextChat: React.FC = () => {
       setOnlineUsersError("No auth token")
       return []
     }
+
     try {
       const res = await fetch(`${API_BASE_URL}/profile/online`, {
         headers: {
@@ -347,7 +373,6 @@ const TextChat: React.FC = () => {
                   </p>
                 </div>
               </div>
-
               {/* Online Status */}
               <div className="flex items-center space-x-2 p-3 bg-[#1BA098]/10 backdrop-blur-sm rounded-xl border border-[#1BA098]/20">
                 <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
@@ -419,7 +444,6 @@ const TextChat: React.FC = () => {
                 </p>
               </div>
             </div>
-
             <div className="flex items-center space-x-3">
               <div className="hidden sm:flex items-center space-x-2 px-3 py-2 bg-[#1BA098]/10 rounded-lg">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -471,55 +495,101 @@ const TextChat: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                filteredMessages.map((message, index) => {
-                  const isOwnMessage = message.sender._id === user?._id
-                  const showAvatar = index === 0 || filteredMessages[index - 1]?.sender._id !== message.sender._id
+                filteredMessages
+                  .map((message, index) => {
+                    // Add null checks for message and sender
+                    if (!message || !message.sender) {
+                      return null // Skip rendering this message if sender data is missing
+                    }
 
-                  return (
-                    <div
-                      key={message._id}
-                      className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} animate-slide-in`}
-                      style={{ animationDelay: `${index * 0.02}s` }}
-                    >
+                    const isOwnMessage = message.sender._id === user?._id
+                    const showAvatar = index === 0 || filteredMessages[index - 1]?.sender?._id !== message.sender._id
+                    return (
                       <div
-                        className={`flex items-end space-x-3 max-w-md ${
-                          isOwnMessage ? "flex-row-reverse space-x-reverse" : ""
-                        }`}
+                        key={message._id || `message-${index}`}
+                        className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} animate-slide-in mb-3`}
+                        style={{ animationDelay: `${index * 0.02}s` }}
                       >
-                        {/* Avatar */}
-                        {showAvatar && (
-                          <div className="w-8 h-8 bg-gradient-to-r from-[#1BA098] to-[#159084] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                            <span className="text-white text-xs font-bold">{getInitials(message.sender.name)}</span>
-                          </div>
-                        )}
-                        {!showAvatar && <div className="w-8"></div>}
-
-                        {/* Message Bubble */}
                         <div
-                          className={`rounded-2xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all duration-200 hover:scale-[1.02] ${
-                            isOwnMessage
-                              ? "bg-gradient-to-r from-[#1BA098] to-[#159084] text-white rounded-br-md border-[#1BA098]/30"
-                              : "bg-[#051622]/60 border-[#1BA098]/20 text-[#DEB992] rounded-bl-md"
+                          className={`flex items-end space-x-2 max-w-[75%] sm:max-w-md ${
+                            isOwnMessage ? "flex-row-reverse space-x-reverse" : ""
                           }`}
                         >
-                          {/* Sender Name */}
-                          {!isOwnMessage && showAvatar && (
-                            <div className="text-xs font-semibold text-[#1BA098] mb-1">{message.sender.name}</div>
+                          {/* Avatar */}
+                          {showAvatar && !isOwnMessage && (
+                            <button
+                              onClick={(e) => handleUserClick(message.sender, e)}
+                              className="w-8 h-8 bg-gradient-to-r from-[#1BA098] to-[#159084] rounded-full flex items-center justify-center flex-shrink-0 shadow-md mb-1 hover:scale-110 transition-transform duration-200 cursor-pointer"
+                            >
+                              <span className="text-white text-xs font-bold">
+                                {getInitials(message.sender?.name || "Unknown")}
+                              </span>
+                            </button>
                           )}
-                          {/* Message Text */}
-                          <div className="break-words leading-relaxed text-sm">{message.text}</div>
-                          {/* Timestamp */}
-                          <div className={`text-xs mt-2 ${isOwnMessage ? "text-white/60" : "text-[#DEB992]/50"}`}>
-                            {new Date(message.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                          {!showAvatar && !isOwnMessage && <div className="w-8"></div>}
+
+                          {/* Message Bubble */}
+                          <div className="relative">
+                            {/* Sender Name for received messages */}
+                            {!isOwnMessage && showAvatar && (
+                              <button
+                                onClick={(e) => handleUserClick(message.sender, e)}
+                                className="text-xs font-semibold text-[#1BA098] mb-1 ml-3 hover:text-[#159084] transition-colors cursor-pointer"
+                              >
+                                {message.sender?.name || "Unknown User"}
+                              </button>
+                            )}
+
+                            <div
+                              className={`relative px-4 py-3 shadow-lg backdrop-blur-sm border transition-all duration-200 hover:scale-[1.02] ${
+                                isOwnMessage
+                                  ? "bg-gradient-to-r from-[#1BA098] to-[#159084] text-white rounded-2xl rounded-br-md border-[#1BA098]/30 shadow-[#1BA098]/20"
+                                  : "bg-[#051622]/80 border-[#1BA098]/20 text-[#DEB992] rounded-2xl rounded-bl-md shadow-black/20"
+                              }`}
+                            >
+                              {/* WhatsApp-style tail */}
+                              <div
+                                className={`absolute bottom-0 w-0 h-0 ${
+                                  isOwnMessage
+                                    ? "right-0 border-l-[12px] border-l-[#159084] border-t-[12px] border-t-transparent"
+                                    : "left-0 border-r-[12px] border-r-[#051622] border-t-[12px] border-t-transparent"
+                                }`}
+                              />
+
+                              {/* Message Text */}
+                              <div className="break-words leading-relaxed text-sm font-medium">
+                                {message.text || "Message content unavailable"}
+                              </div>
+
+                              {/* Timestamp with delivery status for own messages */}
+                              <div
+                                className={`flex items-center justify-end mt-2 space-x-1 ${isOwnMessage ? "text-white/70" : "text-[#DEB992]/50"}`}
+                              >
+                                <span className="text-xs">
+                                  {message.timestamp
+                                    ? new Date(message.timestamp).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })
+                                    : "Unknown time"}
+                                </span>
+                                {isOwnMessage && (
+                                  <svg className="w-4 h-4 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })
+                    )
+                  })
+                  .filter(Boolean)
               )}
 
               {/* Typing Indicator */}
@@ -598,13 +668,12 @@ const TextChat: React.FC = () => {
 
               {showEmojiPicker && !isInputDisabled() && (
                 <div className="absolute bottom-20 left-4 z-50">
-                  <Picker
-                    data={data}
-                    onEmojiSelect={(emoji: any) => {
-                      setNewMessage(newMessage + emoji.native)
+                  <EmojiPicker
+                    theme={Theme.DARK}
+                    onEmojiClick={(emojiData) => {
+                      setNewMessage(newMessage + emojiData.emoji)
                       setShowEmojiPicker(false)
                     }}
-                    theme="dark"
                   />
                 </div>
               )}
@@ -649,31 +718,36 @@ const TextChat: React.FC = () => {
         <div className="lg:hidden fixed inset-0 bg-black/50 z-20" onClick={() => setShowSidebar(false)} />
       )}
 
+      {/* User Profile Popup */}
+      {selectedUser && (
+        <UserProfilePopup user={selectedUser} onClose={closeProfilePopup} anchorPosition={popupPosition} />
+      )}
+
       <style>{`
         @keyframes fade-in {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
-      
+        
         @keyframes slide-in {
           from { opacity: 0; transform: translateX(-10px); }
           to { opacity: 1; transform: translateX(0); }
         }
-      
+        
         @keyframes pulse-subtle {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.05); opacity: 0.8; }
         }
-      
+        
         .animate-fade-in { animation: fade-in 0.5s ease-out; }
         .animate-slide-in { animation: slide-in 0.3s ease-out; }
         .animate-pulse-subtle { animation: pulse-subtle 3s ease-in-out infinite; }
-      
+        
         .animation-delay-100 {
           animation-delay: 0.1s;
           animation-fill-mode: both;
         }
-      
+        
         .animation-delay-200 {
           animation-delay: 0.2s;
           animation-fill-mode: both;
@@ -683,17 +757,17 @@ const TextChat: React.FC = () => {
         .overflow-y-auto::-webkit-scrollbar {
           width: 6px;
         }
-      
+        
         .overflow-y-auto::-webkit-scrollbar-track {
           background: rgba(27, 160, 152, 0.1);
           border-radius: 3px;
         }
-      
+        
         .overflow-y-auto::-webkit-scrollbar-thumb {
           background: rgba(27, 160, 152, 0.3);
           border-radius: 3px;
         }
-      
+        
         .overflow-y-auto::-webkit-scrollbar-thumb:hover {
           background: rgba(27, 160, 152, 0.5);
         }
