@@ -40,6 +40,8 @@ const Inbox: React.FC = () => {
   const [error, setError] = useState("")
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [newMessage, setNewMessage] = useState("")
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [deleteNotification, setDeleteNotification] = useState(false);
   const { user } = useAuth()
   const { socket } = useSocket()
 
@@ -311,8 +313,20 @@ const Inbox: React.FC = () => {
                   return (
                     <div
                       key={message._id || `message-${index}`}
-                      className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
+                      className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} group`}
                     >
+                      {isOwnMessage && (
+                        <button
+                          className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete"
+                          onClick={() => setMessageToDelete(message._id)}
+                        >
+                          {/* Trash icon */}
+                          <svg className="w-4 h-4 text-red-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                          </svg>
+                        </button>
+                      )}
                       <div
                         className={`max-w-[70%] px-4 py-2 rounded-2xl ${
                           isOwnMessage
@@ -369,6 +383,47 @@ const Inbox: React.FC = () => {
           )}
         </div>
       </div>
+      {messageToDelete && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="bg-[#051622] p-6 rounded-xl shadow-lg border border-[#1BA098]/30">
+            <h3 className="text-lg font-semibold mb-4 text-[#DEB992]">Delete this message?</h3>
+            <div className="flex justify-end space-x-3">
+              <button
+                className="px-4 py-2 rounded bg-gray-600 text-white"
+                onClick={() => setMessageToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 text-white"
+                onClick={async () => {
+                  try {
+                    await axiosInstance.delete(`/messages/delete/${messageToDelete}`);
+                    setConversations(prev =>
+                      prev.map(conv => ({
+                        ...conv,
+                        messages: conv.messages.filter(m => m._id !== messageToDelete)
+                      }))
+                    );
+                    setMessageToDelete(null);
+                    setDeleteNotification(true);
+                    setTimeout(() => setDeleteNotification(false), 1000);
+                  } catch {
+                    alert("Failed to delete message");
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteNotification && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-700 text-white px-6 py-2 rounded shadow-lg z-50 transition-opacity duration-300">
+          Message deleted
+        </div>
+      )}
     </div>
   )
 }

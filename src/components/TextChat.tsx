@@ -95,6 +95,10 @@ const TextChat: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<Message["sender"] | null>(null)
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
 
+  // Add state for delete confirmation and notification
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [deleteNotification, setDeleteNotification] = useState<string>("");
+
   // Helper function to check if input should be disabled
   const isInputDisabled = () => {
     return filter !== "today" && filter !== "all"
@@ -546,9 +550,21 @@ const TextChat: React.FC = () => {
                     return (
                       <div
                         key={message._id || `message-${index}`}
-                        className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} animate-slide-in mb-3`}
+                        className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} animate-slide-in mb-3 group`}
                         style={{ animationDelay: `${index * 0.02}s` }}
                       >
+                        {isOwnMessage && (
+                          <button
+                            className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete"
+                            onClick={() => setMessageToDelete(message._id)}
+                          >
+                            {/* Trash icon */}
+                            <svg className="w-4 h-4 text-red-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                            </svg>
+                          </button>
+                        )}
                         <div
                           className={`flex items-end space-x-2 max-w-[75%] sm:max-w-md ${
                             isOwnMessage ? "flex-row-reverse space-x-reverse" : ""
@@ -568,7 +584,7 @@ const TextChat: React.FC = () => {
                           {!showAvatar && !isOwnMessage && <div className="w-8"></div>}
 
                           {/* Message Bubble */}
-                          <div className="relative">
+                          <div className="relative group">
                             {/* Sender Name for received messages - REMOVED */}
                             {/* (was here, now removed as per request) */}
 
@@ -753,6 +769,52 @@ const TextChat: React.FC = () => {
       {/* User Profile Popup */}
       {selectedUser && (
         <UserProfilePopup user={selectedUser} onClose={closeProfilePopup} anchorPosition={popupPosition} />
+      )}
+
+      {/* Delete confirmation popup */}
+      {messageToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 animate-fade-in">
+          <div className="bg-[#051622] border border-[#1BA098]/30 rounded-xl p-8 shadow-2xl max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-4 text-[#DEB992]">Delete Message?</h3>
+            <p className="text-[#DEB992]/80 mb-6">Are you sure you want to delete this message? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-3">
+              <button
+                className="px-4 py-2 rounded-lg bg-[#1BA098]/10 text-[#1BA098] hover:bg-[#1BA098]/20 transition-colors"
+                onClick={() => setMessageToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                onClick={async () => {
+                  if (!messageToDelete) return;
+                  try {
+                    const res = await axiosInstance.delete(`/messages/delete/${messageToDelete}`);
+                    if (res.data.success) {
+                      setMessages((prev) => prev.filter((msg) => msg._id !== messageToDelete));
+                      setDeleteNotification("Message deleted");
+                    } else {
+                      setDeleteNotification(res.data.message || "Failed to delete message");
+                    }
+                  } catch (err) {
+                    setDeleteNotification("Failed to delete message");
+                  } finally {
+                    setMessageToDelete(null);
+                    setTimeout(() => setDeleteNotification(""), 2000);
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete notification */}
+      {deleteNotification && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-[#1BA098] text-white px-6 py-3 rounded-xl shadow-lg animate-fade-in">
+          {deleteNotification}
+        </div>
       )}
 
       <style>{`
