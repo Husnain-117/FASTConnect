@@ -20,22 +20,9 @@ import {
 const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443?transport=tcp",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    }
-  ]
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+  ],
 }
 
 type MatchState = "idle" | "searching" | "matched" | "waiting" | "chatting"
@@ -71,8 +58,6 @@ const VoiceChat = () => {
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  isRunning;
-  connected;
   const { user } = useAuth()
   const { socket } = useSocket()
 
@@ -748,18 +733,18 @@ const VoiceChat = () => {
                       </div>
                     </div>
                     <div className="bg-[#051622]/60 backdrop-blur-sm rounded-2xl p-8 border border-[#1BA098]/20 shadow-xl">
-                      <div className="flex items-center space-x-6 mb-8">
-                        <div className="w-20 h-20 bg-gradient-to-r from-[#1BA098] to-[#159084] rounded-full flex items-center justify-center shadow-lg">
-                          <span className="text-white font-bold text-2xl">
+                      <div className="flex flex-col items-center space-y-6 mb-8">
+                        <div className="w-24 h-24 bg-gradient-to-r from-[#1BA098] to-[#159084] rounded-full flex items-center justify-center shadow-lg">
+                          <span className="text-white font-bold text-3xl">
                             {matchPeer.name?.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <div>
+                        <div className="text-center">
                           <p className="font-bold text-2xl" style={{ color: "#DEB992" }}>
                             {matchPeer.name}
                           </p>
-                          <p className="text-sm" style={{ color: "#DEB992", opacity: 0.7 }}>
-                            {matchPeer.email}
+                          <p className="text-sm mt-1" style={{ color: "#DEB992", opacity: 0.7 }}>
+                            Fast University Student
                           </p>
                         </div>
                       </div>
@@ -845,6 +830,9 @@ const VoiceChat = () => {
                             <p className="font-bold text-lg" style={{ color: "#DEB992" }}>
                               You
                             </p>
+                            <p className="text-xs" style={{ color: "#DEB992", opacity: 0.6 }}>
+                              {user?.name || "Your Name"}
+                            </p>
                             <p
                               className={`text-sm ${
                                 connectionState === "connected"
@@ -873,7 +861,10 @@ const VoiceChat = () => {
                           </div>
                           <div>
                             <p className="font-bold text-lg" style={{ color: "#DEB992" }}>
-                              Connected User
+                              {matchPeer?.name || "Connected User"}
+                            </p>
+                            <p className="text-xs" style={{ color: "#DEB992", opacity: 0.6 }}>
+                              {matchPeer?.email || "Fast University Student"}
                             </p>
                             <p
                               className={`text-sm ${
