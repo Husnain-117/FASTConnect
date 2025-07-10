@@ -44,6 +44,8 @@ const VoiceChat = () => {
   const [usersInRoom, setUsersInRoom] = useState<{ id: string; name: string; email: string }[]>([])
   const [isMuted, setIsMuted] = useState(false)
 
+  isRunning;
+  connected;
   // Enhanced connection state management
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected")
   const [connectionError, setConnectionError] = useState<ConnectionError | null>(null)
