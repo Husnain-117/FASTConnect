@@ -20,9 +20,70 @@ const Register = () => {
   const [isResending, setIsResending] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
   const [isSendingOTP, setIsSendingOTP] = useState(false) // New state for OTP sending
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    length: false,
+    uppercase: false,
+    number: false,
+    special: false,
+  })
+  const [showRequirements, setShowRequirements] = useState(false)
+
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    otp: "",
+    name: "",
+    campus: "",
+    batch: "",
+    password: "",
+  })
 
   const { sendOTP, verifyAndRegister } = useAuth()
   const navigate = useNavigate()
+
+  const validatePassword = (password: string) => {
+    const requirements = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    }
+    setPasswordRequirements(requirements)
+    return Object.values(requirements).every((req) => req)
+  }
+
+  const validateEmail = (email: string) => {
+    if (!email.trim()) return "Email is required"
+    if (!email.endsWith("@nu.edu.pk") && !email.endsWith("@isb.nu.edu.pk")) {
+      return "Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed"
+    }
+    return ""
+  }
+
+  const validateOTP = (otp: string) => {
+    if (!otp.trim()) return "Verification code is required"
+    if (otp.length !== 6) return "Verification code must be 6 digits"
+    if (!/^\d{6}$/.test(otp)) return "Verification code must contain only numbers"
+    return ""
+  }
+
+  const validateName = (name: string) => {
+    if (!name.trim()) return "Full name is required"
+    if (name.trim().length < 2) return "Name must be at least 2 characters"
+    return ""
+  }
+
+  const validateCampus = (campus: string) => {
+    if (!campus.trim()) return "Please select your campus"
+    const validCampuses = ["Islamabad", "Karachi", "Lahore", "Peshawar", "Multan", "Faisalabad"]
+    if (!validCampuses.includes(campus)) return "Please select a valid campus"
+    return ""
+  }
+
+  const validateBatch = (batch: string) => {
+    if (!batch.trim()) return "Batch year is required"
+    if (!/^\d{4}$/.test(batch)) return "Please enter a valid 4-digit year"
+    return ""
+  }
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -45,24 +106,41 @@ const Register = () => {
     setError("")
     setSuccess("")
 
+    // Client-side validation
+    if (!email.trim()) {
+      setError("Please enter your email address.")
+      return
+    }
+
     if (!email.endsWith("@nu.edu.pk") && !email.endsWith("@isb.nu.edu.pk")) {
       setError("Only @nu.edu.pk or @isb.nu.edu.pk email addresses are allowed.")
       return
     }
 
-    setIsSendingOTP(true) // Start loading
+    setIsSendingOTP(true)
 
     try {
       await sendOTP(email)
       setOTPSent(true)
       setSuccess("Verification code sent to your email!")
-      setResendTimer(30) // Reduced to 30 seconds
+      setResendTimer(60) // Changed back to 60 seconds
       setCanResend(false)
       setTimeout(() => setSuccess(""), 2000)
     } catch (err: any) {
-      setError(err.response?.data?.message || "An error occurred")
+      // Handle specific error cases
+      const errorMessage = err.response?.data?.message || err.message || "An error occurred"
+
+      if (errorMessage.toLowerCase().includes("already exists")) {
+        setError("This email is already registered. Please try logging in instead.")
+      } else if (errorMessage.toLowerCase().includes("invalid email")) {
+        setError("Please enter a valid university email address.")
+      } else if (errorMessage.toLowerCase().includes("network")) {
+        setError("Network error. Please check your connection and try again.")
+      } else {
+        setError(errorMessage)
+      }
     } finally {
-      setIsSendingOTP(false) // Stop loading
+      setIsSendingOTP(false)
     }
   }
 
@@ -71,8 +149,56 @@ const Register = () => {
     setError("")
     setSuccess("")
 
+    // Client-side validation
+    if (!email.trim()) {
+      setError("Email is required.")
+      return
+    }
+
+    if (!otp.trim()) {
+      setError("Please enter the verification code.")
+      return
+    }
+
+    if (otp.length !== 6) {
+      setError("Verification code must be 6 digits.")
+      return
+    }
+
+    if (!name.trim()) {
+      setError("Please enter your full name.")
+      return
+    }
+
+    if (!campus.trim()) {
+      setError("Please enter your campus.")
+      return
+    }
+
+    if (!batch.trim()) {
+      setError("Please enter your batch year.")
+      return
+    }
+
+    if (!password.trim()) {
+      setError("Please enter a password.")
+      return
+    }
+
+    // Password validation
+    if (!Object.values(passwordRequirements).every((req) => req)) {
+      const missingRequirements = []
+      if (!passwordRequirements.length) missingRequirements.push("at least 8 characters")
+      if (!passwordRequirements.uppercase) missingRequirements.push("one uppercase letter")
+      if (!passwordRequirements.number) missingRequirements.push("one number")
+      if (!passwordRequirements.special) missingRequirements.push("one special character")
+
+      setError(`Password must contain ${missingRequirements.join(", ")}.`)
+      return
+    }
+
     if (!email.endsWith("@isb.nu.edu.pk") && !email.endsWith("@nu.edu.pk")) {
-      setError("Only @isb.nu.edu.pk email addresses are allowed.")
+      setError("Only @isb.nu.edu.pk or @nu.edu.pk email addresses are allowed.")
       return
     }
 
@@ -85,7 +211,22 @@ const Register = () => {
         navigate("/login")
       }, 2000)
     } catch (err: any) {
-      setError(err.response?.data?.message || "An error occurred")
+      // Handle specific error cases
+      const errorMessage = err.response?.data?.message || err.message || "An error occurred"
+
+      if (errorMessage.toLowerCase().includes("invalid") && errorMessage.toLowerCase().includes("otp")) {
+        setError("Invalid verification code. Please check and try again.")
+      } else if (errorMessage.toLowerCase().includes("expired") && errorMessage.toLowerCase().includes("otp")) {
+        setError("Verification code has expired. Please request a new one.")
+      } else if (errorMessage.toLowerCase().includes("already exists")) {
+        setError("This email is already registered. Please try logging in instead.")
+      } else if (errorMessage.toLowerCase().includes("password")) {
+        setError("Password does not meet security requirements.")
+      } else if (errorMessage.toLowerCase().includes("network")) {
+        setError("Network error. Please check your connection and try again.")
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsRegistering(false)
     }
@@ -98,19 +239,27 @@ const Register = () => {
 
     try {
       await sendOTP(email)
-      setResendTimer(30) // Reduced to 30 seconds
+      setResendTimer(60) // Changed back to 60 seconds
       setCanResend(false)
       setSuccess("Verification code resent successfully!")
       setTimeout(() => setSuccess(""), 3000)
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to resend OTP")
+      const errorMessage = err.response?.data?.message || err.message || "Failed to resend OTP"
+
+      if (errorMessage.toLowerCase().includes("rate limit")) {
+        setError("Too many requests. Please wait before requesting another code.")
+      } else if (errorMessage.toLowerCase().includes("network")) {
+        setError("Network error. Please check your connection and try again.")
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsResending(false)
     }
   }
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-[#051622] overflow-hidden">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-[#051622] overflow-hidden px-4 py-8">
       {/* Animated Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <svg className="w-full h-full" style={{ position: "absolute", top: 0, left: 0 }}>
@@ -130,7 +279,7 @@ const Register = () => {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-md px-2 sm:px-0 flex flex-col items-center animate-fade-in">
+      <div className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-lg lg:max-w-xl px-2 sm:px-4 flex flex-col items-center animate-fade-in">
         {/* Header Section */}
         <div className="text-center mb-8 animate-slide-down">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-[#1BA098] rounded-full mb-4 shadow-lg animate-pulse-subtle">
@@ -273,6 +422,10 @@ const Register = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={isSendingOTP}
+                        onBlur={(e) => {
+                          const emailError = validateEmail(e.target.value)
+                          setFieldErrors((prev) => ({ ...prev, email: emailError }))
+                        }}
                       />
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,6 +438,7 @@ const Register = () => {
                         </svg>
                       </div>
                     </div>
+                    {fieldErrors.email && <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p>}
                   </div>
                   <button
                     type="submit"
@@ -365,7 +519,12 @@ const Register = () => {
                       onChange={(e) => setOTP(e.target.value)}
                       className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02] text-center text-lg font-mono tracking-widest"
                       maxLength={6}
+                      onBlur={(e) => {
+                        const otpError = validateOTP(e.target.value)
+                        setFieldErrors((prev) => ({ ...prev, otp: otpError }))
+                      }}
                     />
+                    {fieldErrors.otp && <p className="mt-1 text-xs text-red-400">{fieldErrors.otp}</p>}
                     <div className="flex items-center justify-between mt-2">
                       <div className="text-sm" style={{ color: "#DEB992", opacity: 0.8 }}>
                         Didn't receive the code?
@@ -413,7 +572,7 @@ const Register = () => {
                     </div>
                   </div>
                   {/* Name and Campus Row */}
-                  <div className="grid grid-cols-2 gap-4 animate-fade-in-delay-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in-delay-5">
                     <div>
                       <label
                         className="block text-lg font-medium mb-2 transition-all duration-300"
@@ -428,7 +587,12 @@ const Register = () => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-xs sm:text-sm transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02]"
+                        onBlur={(e) => {
+                          const nameError = validateName(e.target.value)
+                          setFieldErrors((prev) => ({ ...prev, name: nameError }))
+                        }}
                       />
+                      {fieldErrors.name && <p className="mt-1 text-xs text-red-400">{fieldErrors.name}</p>}
                     </div>
                     <div>
                       <label
@@ -437,18 +601,51 @@ const Register = () => {
                       >
                         Campus
                       </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Islamabad"
-                        value={campus}
-                        onChange={(e) => setCampus(e.target.value)}
-                        className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-xs sm:text-sm transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02]"
-                      />
+                      <div className="relative">
+                        <select
+                          required
+                          value={campus}
+                          onChange={(e) => setCampus(e.target.value)}
+                          className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-xs sm:text-sm transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02] appearance-none pr-10"
+                          onBlur={(e) => {
+                            const campusError = validateCampus(e.target.value)
+                            setFieldErrors((prev) => ({ ...prev, campus: campusError }))
+                          }}
+                        >
+                          <option value="" disabled className="text-gray-500">
+                            Select your campus
+                          </option>
+                          <option value="Islamabad" className="text-gray-900">
+                            Islamabad
+                          </option>
+                          <option value="Karachi" className="text-gray-900">
+                            Karachi
+                          </option>
+                          <option value="Lahore" className="text-gray-900">
+                            Lahore
+                          </option>
+                          <option value="Peshawar" className="text-gray-900">
+                            Peshawar
+                          </option>
+                          <option value="Multan" className="text-gray-900">
+                            Multan
+                          </option>
+                          <option value="Faisalabad" className="text-gray-900">
+                            Faisalabad
+                          </option>
+                        </select>
+                        {/* Custom dropdown arrow */}
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                      {fieldErrors.campus && <p className="mt-1 text-xs text-red-400">{fieldErrors.campus}</p>}
                     </div>
                   </div>
                   {/* Batch and Password Row */}
-                  <div className="grid grid-cols-2 gap-4 animate-fade-in-delay-6">
+                  <div className="space-y-4 animate-fade-in-delay-6">
                     <div>
                       <label
                         className="block text-lg font-medium mb-2 transition-all duration-300"
@@ -463,7 +660,12 @@ const Register = () => {
                         value={batch}
                         onChange={(e) => setBatch(e.target.value)}
                         className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-xs sm:text-sm transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02]"
+                        onBlur={(e) => {
+                          const batchError = validateBatch(e.target.value)
+                          setFieldErrors((prev) => ({ ...prev, batch: batchError }))
+                        }}
                       />
+                      {fieldErrors.batch && <p className="mt-1 text-xs text-red-400">{fieldErrors.batch}</p>}
                     </div>
                     <div>
                       <label
@@ -478,7 +680,15 @@ const Register = () => {
                           required
                           placeholder="••••••••"
                           value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          onChange={(e) => {
+                            setPassword(e.target.value)
+                            validatePassword(e.target.value)
+                          }}
+                          onFocus={() => setShowRequirements(true)}
+                          onBlur={() => {
+                            setShowRequirements(false)
+                            setFieldErrors((prev) => ({ ...prev, password: "" }))
+                          }}
                           className="w-full px-2 py-2 sm:px-3 sm:py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-base sm:text-lg transition-all duration-300 hover:scale-[1.02] focus:scale-[1.02] pr-10"
                         />
                         <button
@@ -514,12 +724,52 @@ const Register = () => {
                           )}
                         </button>
                       </div>
+                      {/* Password Requirements Display */}
+                      {showRequirements && (
+                        <div className="mt-2 p-3 bg-[#051622]/40 backdrop-blur-sm rounded-lg border border-[#1BA098]/20 animate-slide-in">
+                          <p className="text-xs font-medium text-[#DEB992] mb-2">Password must contain:</p>
+                          <div className="space-y-1">
+                            <div
+                              className={`flex items-center space-x-2 text-xs ${passwordRequirements.length ? "text-green-400" : "text-[#DEB992]/60"}`}
+                            >
+                              <div
+                                className={`w-3 h-3 rounded-full ${passwordRequirements.length ? "bg-green-400" : "bg-gray-500"}`}
+                              ></div>
+                              <span>At least 8 characters</span>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 text-xs ${passwordRequirements.uppercase ? "text-green-400" : "text-[#DEB992]/60"}`}
+                            >
+                              <div
+                                className={`w-3 h-3 rounded-full ${passwordRequirements.uppercase ? "bg-green-400" : "bg-gray-500"}`}
+                              ></div>
+                              <span>One uppercase letter (A-Z)</span>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 text-xs ${passwordRequirements.number ? "text-green-400" : "text-[#DEB992]/60"}`}
+                            >
+                              <div
+                                className={`w-3 h-3 rounded-full ${passwordRequirements.number ? "bg-green-400" : "bg-gray-500"}`}
+                              ></div>
+                              <span>One number (0-9)</span>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 text-xs ${passwordRequirements.special ? "text-green-400" : "text-[#DEB992]/60"}`}
+                            >
+                              <div
+                                className={`w-3 h-3 rounded-full ${passwordRequirements.special ? "bg-green-400" : "bg-gray-500"}`}
+                              ></div>
+                              <span>One special character (!@#$%^&*)</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
                     type="submit"
                     onClick={handleVerifyAndRegister}
-                    disabled={isRegistering}
+                    disabled={isRegistering || !Object.values(passwordRequirements).every((req) => req)}
                     className="w-full bg-[#1BA098] text-[#051622] py-3 px-6 rounded-xl font-bold text-lg mt-2 hover:bg-[#159084] focus:outline-none focus:ring-2 focus:ring-[#1BA098] focus:ring-offset-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 hover:shadow-lg animate-fade-in-delay-7"
                   >
                     {isRegistering ? (
